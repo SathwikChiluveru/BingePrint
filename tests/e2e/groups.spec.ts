@@ -36,9 +36,9 @@ test("login page offers Google and email sign-in", async ({ page }) => {
   await expect(page.getByRole("textbox", { name: /email/i })).toBeVisible();
 });
 
-test("login ignores an off-site next parameter", async ({ page }) => {
+test("login ignores an off-site next parameter", async ({ page, baseURL }) => {
   await page.goto("/auth/login?next=//evil.example.com");
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
   // The page must not have navigated away
-  expect(new URL(page.url()).host).toBe("localhost:3217");
+  expect(new URL(page.url()).host).toBe(new URL(baseURL!).host);
 });

@@ -60,3 +60,4 @@ testdata/
 # playwright
 /test-results/
 /playwright-report/
+.env*
