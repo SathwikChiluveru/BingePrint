@@ -1,0 +1,431 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-19T00:00:00Z",
+  "title": "Design System: Autoplayed",
+  "extensions": {
+    "colorMeta": {
+      "reel-red": {
+        "role": "primary",
+        "displayName": "Reel Red",
+        "canonical": "#e50914",
+        "tonalRamp": [
+          "#3d0205",
+          "#640308",
+          "#8c050c",
+          "#b80710",
+          "#e50914",
+          "#ff4d55",
+          "#ff8a90",
+          "#ffc7ca"
+        ]
+      },
+      "reel-red-hover": {
+        "role": "primary",
+        "displayName": "Reel Red, Hover",
+        "canonical": "#f40612"
+      },
+      "reel-red-text": {
+        "role": "primary",
+        "displayName": "Reel Red, Text",
+        "canonical": "#ff4d55"
+      },
+      "reel-red-wash": {
+        "role": "primary",
+        "displayName": "Red Wash",
+        "canonical": "rgba(229, 9, 20, 0.15)"
+      },
+      "reel-red-edge": {
+        "role": "primary",
+        "displayName": "Red Edge",
+        "canonical": "rgba(229, 9, 20, 0.35)"
+      },
+      "screening-room": {
+        "role": "neutral",
+        "displayName": "Screening Room",
+        "canonical": "#141414",
+        "tonalRamp": [
+          "#0a0a0a",
+          "#141414",
+          "#1a1a1a",
+          "#242424",
+          "#2e2e2e",
+          "#8c8c8c",
+          "#b3b3b3",
+          "#ffffff"
+        ]
+      },
+      "screening-room-veil": {
+        "role": "neutral",
+        "displayName": "Screening Room Veil",
+        "canonical": "rgba(20, 20, 20, 0.92)"
+      },
+      "seat-row": {
+        "role": "neutral",
+        "displayName": "Seat Row",
+        "canonical": "#1a1a1a"
+      },
+      "seat-row-raised": {
+        "role": "neutral",
+        "displayName": "Seat Row, Raised",
+        "canonical": "#242424"
+      },
+      "seat-row-hover": {
+        "role": "neutral",
+        "displayName": "Seat Row, Hover",
+        "canonical": "#2e2e2e"
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "rgba(255, 255, 255, 0.08)"
+      },
+      "hairline-strong": {
+        "role": "neutral",
+        "displayName": "Hairline, Strong",
+        "canonical": "rgba(255, 255, 255, 0.16)"
+      },
+      "marquee-white": {
+        "role": "neutral",
+        "displayName": "Marquee White",
+        "canonical": "#ffffff"
+      },
+      "credits-grey": {
+        "role": "neutral",
+        "displayName": "Credits Grey",
+        "canonical": "#b3b3b3"
+      },
+      "usher-grey": {
+        "role": "neutral",
+        "displayName": "Usher Grey",
+        "canonical": "#8c8c8c"
+      },
+      "green-light": {
+        "role": "status",
+        "displayName": "Green Light",
+        "canonical": "#46d369",
+        "tonalRamp": [
+          "#0b2814",
+          "#134a24",
+          "#1d6d35",
+          "#299147",
+          "#46d369",
+          "#74e08f",
+          "#a4ebb5",
+          "#d4f6dc"
+        ]
+      },
+      "amber-light": {
+        "role": "status",
+        "displayName": "Amber Light",
+        "canonical": "#f5a623",
+        "tonalRamp": [
+          "#3a2504",
+          "#5f3d07",
+          "#86560a",
+          "#b0720e",
+          "#f5a623",
+          "#f8bd5c",
+          "#fbd494",
+          "#fdeccd"
+        ]
+      },
+      "screen-track": {
+        "role": "neutral",
+        "displayName": "Screen Track",
+        "canonical": "rgba(255, 255, 255, 0.05)",
+        "token": "--color-track"
+      },
+      "screen-track-strong": {
+        "role": "neutral",
+        "displayName": "Screen Track, Strong",
+        "canonical": "rgba(255, 255, 255, 0.55)",
+        "token": "--color-track-strong"
+      }
+    },
+    "typographyMeta": {
+      "hero-stat": {
+        "displayName": "Hero stat",
+        "purpose": "The one number per wrapped slide via .slide-hero (clamp 4.5rem, 22vw, 8rem; short screens clamp 3.75rem, 18vw, 6rem); units via .slide-hero-unit at 0.5em; optionally red-gradient filled."
+      },
+      "display": {
+        "displayName": "Display",
+        "purpose": "Landing hero and slide headlines. Utility: text-display."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Section titles on landing, groups and compare pages. Utility: text-headline."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Card titles and show names in lists. Utility: text-title."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Copy and descriptions in Credits Grey, max 60ch."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Uppercase slide kickers and stat-card labels in Usher Grey; slides only."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Invite codes and file names."
+      },
+      "hero-week-long": {
+        "displayName": "Hero stat, Your week long (named exception)",
+        "purpose": "Slide 7 heroes of 5+ visible characters step down to clamp(3.5rem, 18vw, min(8rem, 15vh)) so they fit 320px and short windows."
+      },
+      "hero-personality": {
+        "displayName": "Personality climax (named exception)",
+        "purpose": "Slide 8 personality word: 900, clamp(3.5rem, 15vw, 6.5rem), line-height 0.92, -0.04em, balanced wrap (max two lines at 320px); \"The\" steps down to a Headline line above it."
+      }
+    },
+    "shadows": [
+      {
+        "name": "card",
+        "value": "0 4px 24px rgba(0, 0, 0, 0.4)",
+        "purpose": "Every card and panel at rest."
+      },
+      {
+        "name": "btn-hover",
+        "value": "0 10px 28px -10px rgba(229, 9, 20, 0.65)",
+        "purpose": "Red halo under a hovered primary button."
+      },
+      {
+        "name": "glow-red",
+        "value": "0 0 40px rgba(229, 9, 20, 0.3)",
+        "purpose": "Around hero elements and progress rings on slides."
+      },
+      {
+        "name": "glow-subtle",
+        "value": "0 0 60px rgba(229, 9, 20, 0.1)",
+        "purpose": "Faint wash behind feature panels."
+      },
+      {
+        "name": "glow-hero",
+        "value": "radial-gradient(ellipse 60% 50% at 50% 50%, rgba(229, 9, 20, 0.15) 0%, transparent 70%)",
+        "purpose": "Token --glow-hero: the one glow source per wrapped slide, centered behind the hero. Centered slides apply it to the slide; left-aligned slides (Top five, Biggest binge) anchor it to the hero via HeroGlow."
+      }
+    ],
+    "motion": [
+      {
+        "name": "spring (JS constant)",
+        "value": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+        "purpose": "Hero stat pop-in on slides only (about 500ms). Lives as a framer-motion constant in the slide components, not as a CSS token; no stylesheet uses it."
+      },
+      {
+        "name": "ease-smooth",
+        "value": "cubic-bezier(0.4, 0, 0.2, 1)",
+        "purpose": "Slide transitions (350ms), fades, button states."
+      },
+      {
+        "name": "ease-out-expo",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Landing page entrances."
+      },
+      {
+        "name": "duration-fast",
+        "value": "150ms",
+        "purpose": "Hover and press feedback."
+      },
+      {
+        "name": "duration-base",
+        "value": "250ms",
+        "purpose": "Standard state transitions."
+      },
+      {
+        "name": "duration-slow",
+        "value": "400ms",
+        "purpose": "Supporting copy fade-up."
+      },
+      {
+        "name": "popover",
+        "value": "150ms",
+        "purpose": "Exit confirm popover fade and 0.96 scale from top right."
+      },
+      {
+        "name": "stagger",
+        "value": "120ms",
+        "purpose": "Delay between list items on slides."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "base",
+        "value": "375px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "short",
+        "value": "max-height: 640px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one red action per screen.",
+      "html": "<button class=\"ds-btn-primary\">Get my reel <svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14M13 6l6 6-6 6\"/></svg></button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 12px 24px; background: var(--color-red, #e50914); color: #fff; border: none; border-radius: 12px; font: 600 1rem/1.2 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; cursor: pointer; transition: background 150ms cubic-bezier(0.4,0,0.2,1), transform 150ms cubic-bezier(0.4,0,0.2,1), box-shadow 150ms cubic-bezier(0.4,0,0.2,1); } .ds-btn-primary:hover { background: var(--color-red-hover, #f40612); transform: translateY(-1px); box-shadow: 0 10px 28px -10px rgba(229,9,20,0.65); } .ds-btn-primary:active { transform: translateY(0); box-shadow: none; } .ds-btn-primary:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Neutral actions like Sign in.",
+      "html": "<button class=\"ds-btn-secondary\">Sign in</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 12px 24px; background: var(--color-surface-2, #242424); color: #fff; border: 1px solid var(--color-border, rgba(255,255,255,0.08)); border-radius: 12px; font: 600 1rem/1.2 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; cursor: pointer; transition: background 150ms cubic-bezier(0.4,0,0.2,1), border-color 150ms cubic-bezier(0.4,0,0.2,1); } .ds-btn-secondary:hover { background: var(--color-surface-3, #2e2e2e); border-color: var(--color-border-strong, rgba(255,255,255,0.16)); } .ds-btn-secondary:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }"
+    },
+    {
+      "name": "Invite Code Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Text field; invite codes use mono with wide tracking.",
+      "html": "<input class=\"ds-input\" type=\"text\" maxlength=\"8\" placeholder=\"e.g. abc12def\" aria-label=\"Invite code\">",
+      "css": ".ds-input { width: 100%; max-width: 320px; padding: 12px 16px; background: var(--color-surface-2, #242424); color: #fff; border: 1px solid var(--color-border, rgba(255,255,255,0.08)); border-radius: 12px; font: 400 0.875rem/1.5 ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace; letter-spacing: 0.1em; caret-color: #e50914; transition: border-color 150ms cubic-bezier(0.4,0,0.2,1); } .ds-input::placeholder { color: #8c8c8c; } .ds-input:hover { border-color: rgba(255,255,255,0.16); } .ds-input:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }"
+    },
+    {
+      "name": "Glass Card",
+      "kind": "card",
+      "refersTo": "glass-panel",
+      "description": "Panel over a red glow; blurs the light behind it.",
+      "html": "<div class=\"ds-stage\"><div class=\"ds-glass\"><p class=\"ds-glass-label\">Top show</p><p class=\"ds-glass-title\">Grey's Anatomy</p><p class=\"ds-glass-body\">341 episodes. The doctors know you by name.</p></div></div>",
+      "css": ".ds-stage { padding: 32px; background: radial-gradient(ellipse 60% 50% at 50% 50%, rgba(229,9,20,0.15) 0%, transparent 70%), #141414; border-radius: 24px; } .ds-glass { padding: 24px; background: rgba(26,26,26,0.8); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.4); color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; } .ds-glass-label { margin: 0 0 8px; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #8c8c8c; } .ds-glass-title { margin: 0 0 4px; font-size: 1.25rem; font-weight: 600; } .ds-glass-body { margin: 0; color: #b3b3b3; line-height: 1.6; }"
+    },
+    {
+      "name": "Wrapped Slide Hero",
+      "kind": "custom",
+      "refersTo": "hero-stat",
+      "description": "Signature frame: label, one giant number (.slide-hero), exactly one roast line (the only friend dig is on Personality), --glow-hero behind. Built on .slide-container + .slide-stack so tall content scrolls instead of clipping; top spacer reserves 56px + notch inset. Tap zones: left third back, rest forward.",
+      "html": "<div class=\"ds-slide\"><p class=\"ds-slide-label\">You watched</p><p class=\"ds-slide-hero\">~4,046</p><p class=\"ds-slide-unit\">hours</p><p class=\"ds-slide-copy\">169 days straight. Your couch has a dent shaped like you.</p></div>",
+      "css": ".ds-slide { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; aspect-ratio: 9 / 16; max-width: 320px; padding: 24px; background: radial-gradient(ellipse 60% 50% at 50% 50%, rgba(229,9,20,0.15) 0%, transparent 70%), #141414; border: 1px solid rgba(255,255,255,0.08); border-radius: 24px; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif; } .ds-slide-label { margin: 0 0 12px; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #8c8c8c; } .ds-slide-hero { margin: 0; font-size: 4.5rem; font-weight: 900; line-height: 0.95; letter-spacing: -0.05em; background: linear-gradient(135deg, #e50914 0%, #ff6b6b 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; } .ds-slide-unit { margin: 8px 0 24px; font-size: 1.25rem; font-weight: 600; } .ds-slide-copy { margin: 0; color: #b3b3b3; line-height: 1.6; }"
+    },
+    {
+      "name": "Progress Dots",
+      "kind": "nav",
+      "refersTo": "progress-dot",
+      "description": "Slide position under an n / total counter; current dot stretches to a red pill; 44px-tall hit areas that shrink in width to fit 320px; labels name the slide (\"Go to Top show, slide 3 of 8\"); hidden on the last slide. Current slide resumes from sessionStorage per session.",
+      "html": "<div class=\"ds-dots\" role=\"tablist\" aria-label=\"Slides\"><button class=\"ds-dot\" aria-label=\"Slide 1\"></button><button class=\"ds-dot ds-dot-active\" aria-label=\"Slide 2\" aria-current=\"true\"></button><button class=\"ds-dot\" aria-label=\"Slide 3\"></button><button class=\"ds-dot\" aria-label=\"Slide 4\"></button></div>",
+      "css": ".ds-dots { display: flex; gap: 8px; padding: 16px; background: #141414; border-radius: 9999px; width: max-content; } .ds-dot { width: 8px; height: 8px; padding: 0; border: none; border-radius: 9999px; background: #2e2e2e; cursor: pointer; transition: width 250ms cubic-bezier(0.4,0,0.2,1), background 250ms cubic-bezier(0.4,0,0.2,1); } .ds-dot:hover { background: #8c8c8c; } .ds-dot-active, .ds-dot-active:hover { width: 20px; background: #e50914; } .ds-dot:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }"
+    },
+    {
+      "name": "Error Notice",
+      "kind": "custom",
+      "refersTo": "reel-red-wash",
+      "description": "Inline error with recovery hint.",
+      "html": "<div class=\"ds-error\" role=\"alert\"><p class=\"ds-error-title\">That file doesn't look like Netflix history.</p><p class=\"ds-error-body\">Download it from netflix.com/viewingactivity and try again.</p></div>",
+      "css": ".ds-error { max-width: 420px; padding: 16px; background: rgba(229,9,20,0.15); border: 1px solid rgba(229,9,20,0.35); border-radius: 12px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; } .ds-error-title { margin: 0 0 4px; color: #ff4d55; font-weight: 600; font-size: 0.875rem; } .ds-error-body { margin: 0; color: #b3b3b3; font-size: 0.875rem; line-height: 1.5; }"
+    },
+    {
+      "name": "Slideshow Chrome Button",
+      "kind": "button",
+      "refersTo": "slide-chrome-button",
+      "description": "Exit X (top-right) and mobile last-slide Back (bottom-left, 12px above the home-indicator inset): 44px veiled circle with functional blur so scrolled content stays legible under it.",
+      "html": "<button class=\"ds-chrome\" aria-label=\"Exit\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" aria-hidden=\"true\"><path d=\"M18 6L6 18M6 6l12 12\"/></svg></button>",
+      "css": ".ds-chrome { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0; border-radius: 9999px; background: rgba(20,20,20,0.92); border: 1px solid rgba(255,255,255,0.08); color: #b3b3b3; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); cursor: pointer; transition: color 150ms cubic-bezier(0.4,0,0.2,1), border-color 150ms cubic-bezier(0.4,0,0.2,1); } .ds-chrome:hover { color: #fff; border-color: rgba(255,255,255,0.16); } .ds-chrome:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }"
+    },
+    {
+      "name": "Exit Confirm",
+      "kind": "custom",
+      "refersTo": "exit-confirm",
+      "description": "Glass popover anchored under the X. Stay is focused on open; Escape and outside taps close only the popover. No red: leaving is never the focal action.",
+      "html": "<div class=\"ds-confirm\" role=\"dialog\" aria-labelledby=\"ds-confirm-t\"><p id=\"ds-confirm-t\" class=\"ds-confirm-title\">Leave your reel?</p><p class=\"ds-confirm-body\">Your stats stay saved on this device.</p><div class=\"ds-confirm-row\"><button class=\"ds-confirm-stay\">Stay</button><a class=\"ds-confirm-exit\" href=\"#\">Yes, exit</a></div></div>",
+      "css": ".ds-confirm { width: 288px; padding: 16px; background: rgba(26,26,26,0.8); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.4); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; } .ds-confirm-title { margin: 0; color: #fff; font-weight: 600; font-size: 1rem; } .ds-confirm-body { margin: 4px 0 0; color: #b3b3b3; font-size: 0.875rem; } .ds-confirm-row { display: flex; gap: 8px; margin-top: 16px; } .ds-confirm-stay, .ds-confirm-exit { flex: 1; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 16px; border-radius: 12px; font: 600 0.875rem/1.2 inherit; } .ds-confirm-stay { background: #242424; color: #fff; border: 1px solid rgba(255,255,255,0.08); cursor: pointer; } .ds-confirm-stay:hover { background: #2e2e2e; border-color: rgba(255,255,255,0.16); } .ds-confirm-exit { color: #b3b3b3; text-decoration: none; text-underline-offset: 4px; } .ds-confirm-exit:hover { text-decoration: underline; } .ds-confirm-stay:focus-visible, .ds-confirm-exit:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }"
+    },
+    {
+      "name": "Share Card",
+      "kind": "card",
+      "refersTo": "share-card",
+      "description": "Signature end frame: on-screen twin of the share PNG. Wordmark with a drawn play-triangle mark (white on screen, Reel Red in the PNG). White personality hero over one faint glow, roast line, divider, top-show punchline, one total. The red on slide 10 belongs to the CTA below (share, invite, or stack up), so the card adds none; the exported PNG alone fills the hero with the red gradient (exported images are exempt from The One Red Thing Rule). Invite actions have exactly three names: \"Start my group and invite\" (create; sends share_teaser: true, disclosed by the helper line \"Starts a group with your stats, never your file. Friends with the code see your personality.\"), \"Share my card and invite\" (has a group), \"Share my card\" (no invite); \"Share it now\" is only the follow-up step after a create. A fresh pending invite (including ?join=CODE on /wrapped/{id}) means stack-up mode, checked before create. Create mode is distilled to card, one tease line, the red CTA, one disclosure line, and one secondary row: a \"Join a friend's group\" secondary button beside a quiet \"Share my card\"; \"Upload a different file\" is overflow (hidden on short screens and below md in create mode). \"Card shared\" with no group says \"Now start a group?\" and refocuses the CTA. With a group, a quiet \"Open {group name}\" link that becomes a secondary button after \"Card shared\". Empty reels show \"Nothing to share yet\" with an Upload CTA instead of group creation. A 422 on create says \"Your stats couldn't be read. Upload your file again.\" Invite codes display uppercase everywhere, and share text carries the code plus the link. Only a 2xx group check confirms the code; 404 forgets the group; 401, 5xx, network failure or an 8s timeout share without the code as \"Share my card\". A group from an older reel is cleared on mount.",
+      "html": "<div class=\"ds-share\"><p class=\"ds-share-mark\">Autoplayed</p><p class=\"ds-share-hero\">The Night Shift</p><p class=\"ds-share-roast\">Your sleep schedule filed a complaint.</p><hr class=\"ds-share-rule\"><p class=\"ds-share-top\">341 episodes of Grey's Anatomy</p><p class=\"ds-share-total\"><span class=\"ds-share-num\">~4,046</span><span class=\"ds-share-label\">hours</span></p><p class=\"ds-share-foot\">Not affiliated with Netflix.</p></div>",
+      "css": ".ds-share { position: relative; max-width: 384px; padding: 20px 24px 16px; text-align: center; background: radial-gradient(ellipse 65% 40% at 50% 30%, rgba(229,9,20,0.15) 0%, transparent 70%), #1a1a1a; border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; box-shadow: 0 4px 24px rgba(0,0,0,0.4); color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif; } .ds-share-mark { margin: 0; text-align: left; font-weight: 900; font-size: 1.125rem; letter-spacing: -0.02em; } .ds-share-hero { margin: 16px 0 0; font-weight: 900; font-size: 3rem; line-height: 0.95; letter-spacing: -0.03em; text-wrap: balance; } .ds-share-roast { margin: 12px 0 0; color: #b3b3b3; font-size: 0.875rem; line-height: 1.4; } .ds-share-rule { width: 40%; margin: 16px auto 0; border: 0; height: 1px; background: rgba(255,255,255,0.16); } .ds-share-top { margin: 16px 0 0; font-weight: 600; } .ds-share-total { display: flex; align-items: baseline; justify-content: center; gap: 8px; margin: 8px 0 0; } .ds-share-num { font-weight: 900; font-size: 2rem; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; } .ds-share-label { color: #8c8c8c; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; } .ds-share-foot { margin: 16px 0 0; color: #8c8c8c; font-size: 0.75rem; }"
+    },
+    {
+      "name": "Compare Page",
+      "kind": "card",
+      "refersTo": "compare-page",
+      "description": "A Roast Reel surface, not a dashboard: head-to-head rows instead of a stat-card grid, one hero per section with --glow-hero behind it, a roast line per comparison, \"~\" on every estimate; compares titles when any member is date-only.",
+      "html": "<section class=\"ds-compare\"><p class=\"ds-compare-label\">Most hours</p><p class=\"ds-compare-hero\">~412</p><p class=\"ds-compare-roast\">Sam out-watched the whole group. Again.</p></section>",
+      "css": ".ds-compare { max-width: 384px; padding: 24px; text-align: center; background: radial-gradient(ellipse 60% 50% at 50% 40%, rgba(229,9,20,0.15) 0%, transparent 70%), #141414; border-radius: 20px; } .ds-compare-label { font: 600 0.75rem system-ui, sans-serif; letter-spacing: 0.1em; text-transform: uppercase; color: #8c8c8c; } .ds-compare-hero { font: 900 4.5rem/0.95 system-ui, sans-serif; letter-spacing: -0.05em; color: #fff; margin: 8px 0; } .ds-compare-roast { font: 600 1.25rem system-ui, sans-serif; color: #fff; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Roast Reel",
+    "overview": "Autoplayed is a highlight reel that teases you. Every wrapped slide is one punchline: a single enormous number or word lands in the middle of a dark screening room, a red glow blooms behind it, and a line of copy delivers the joke. The reel exists to be screenshotted and dropped into the group chat, so each frame must read in a glance on a phone and still look good cropped.\n\nThe atmosphere is cinematic: near-black backgrounds, soft radial red light, glass panels that let the glow through. That glow is the brand's warmth and carries across the whole app, not just the slides. The rest of the interface stays quiet and dark so the hero always wins. Density is low and confident: big type, wide margins, one idea per screen.\n\nThe palette is Netflix-adjacent by choice, but Autoplayed is clearly unofficial: it never borrows the Netflix logo, wordmark, or \"N\" mark, and it says plainly that it is not affiliated.",
+    "keyCharacteristics": [
+      "One hero per frame: a huge black-weight number or word, everything else steps back.",
+      "Cinematic red glow (radial gradients, soft halos) as the signature atmosphere.",
+      "Dark-only: a screening room, never a lit page.",
+      "Bold, punchy, teasing copy set big enough to screenshot.",
+      "Motion that lands like a reveal: hero pops in (or rises, wipes from the frame edge), context fades up after; the Personality verdict is stamped in with a swelling glow and a held beat.",
+      "A reel that ends on its verdict: Most loyal, then Personality, then the share card.",
+      "Scroll-safe frames: slides center when they fit and scroll from the top when they do not.",
+      "Every slide from 2 to 9 carries a small \"Autoplayed · {host}\" watermark so screenshots keep their attribution."
+    ],
+    "rules": [
+      {
+        "name": "The One Red Thing Rule",
+        "body": "Each screen has one red focal point: the primary action or the hero glow. If two things are red, one of them is wrong. On slide 10 the red is the CTA, so the on-screen share card's hero is white. Exported images are exempt: the share PNG carries no CTA, so its personality hero takes the red gradient.",
+        "section": "colors"
+      },
+      {
+        "name": "The Forced Colors Rule",
+        "body": "Transparent-fill text (.text-gradient-red) falls back to CanvasText under forced-colors: active so heroes never vanish.",
+        "section": "colors"
+      },
+      {
+        "name": "The Count The Notch Once Rule",
+        "body": ".slide-stack reserves 56px plus the top safe-area inset; the slide box never adds it again.",
+        "section": "layout"
+      },
+      {
+        "name": "The Two Taps To Leave Rule",
+        "body": "The X opens an inline confirm anchored to it; Escape and outside taps close only the popover, never the reel.",
+        "section": "components"
+      },
+      {
+        "name": "The Small Red Text Rule",
+        "body": "Red text under 24px uses Reel Red, Text, never Reel Red. Reel Red fails contrast at body sizes.",
+        "section": "colors"
+      },
+      {
+        "name": "The Size Is The Joke Rule",
+        "body": "The punchline is carried by scale, not decoration. If a hero needs an icon or emoji to land, the number is not big enough.",
+        "section": "typography"
+      },
+      {
+        "name": "The Spotlight Rule",
+        "body": "Glow follows the hero. One glow source per frame, centered on the thing the frame is about; never glow on chrome like nav bars or inputs.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do give every wrapped slide exactly one hero stat at hero-stat size (or a named exception: Your week long hero, Personality climax), with the red glow centered behind it.",
+      "Do use Reel Red, Text (`#ff4d55`) for any red text under 24px.",
+      "Do keep the spring overshoot easing for hero pop-ins on slides only; UI chrome uses the smooth or out-expo easing.",
+      "Do mark estimated numbers with \"~\" and a short Usher Grey note.",
+      "Do keep a 44px minimum touch target on every control and a visible white focus ring.",
+      "Do say \"not affiliated with Netflix\" wherever the brand could be mistaken as official.",
+      "Do build slide columns with .slide-container plus .slide-stack so tall content scrolls instead of clipping.",
+      "Do use --glow-hero, --color-track and --color-track-strong instead of inline glows and bar fills.",
+      "Do use text-display, text-headline and text-title instead of arbitrary text sizes.",
+      "Do ask before leaving the reel; keep slide 10's red on the CTA."
+    ],
+    "donts": [
+      "Don't use the Netflix logo, wordmark, or \"N\" mark anywhere.",
+      "Don't use gradient text on page headings; the red gradient belongs to slide hero stats only.",
+      "Don't put more than one glow source or more than one red focal point in a frame.",
+      "Don't use emoji as icons; use inline SVG.",
+      "Don't add uppercase eyebrow labels above page headlines; labels live on slides and stat cards.",
+      "Don't build rows of identical icon-plus-heading cards; use divided lists.",
+      "Don't introduce a light theme; the system is dark-only.",
+      "Don't add env(safe-area-inset-top) to a slide box; .slide-stack already reserves it.",
+      "Don't use justify-content: center on a slide column; it cuts off overflow above the fold."
+    ]
+  }
+}

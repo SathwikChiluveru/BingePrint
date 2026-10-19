@@ -1,0 +1,293 @@
+@import "tailwindcss";
+@import "../styles/tokens.css";
+
+/* Short viewports (iPhone SE Safari, landscape phones): wrapped slides compact. */
+@custom-variant short (@media (max-height: 640px));
+
+/* DESIGN.md type roles as utilities: text-display, text-headline, text-title. */
+@theme {
+  --text-display: clamp(3rem, 8vw, 4.5rem);
+  --text-display--line-height: 0.95;
+  --text-display--letter-spacing: -0.03em;
+  --text-headline: clamp(1.875rem, 4vw, 2.25rem);
+  --text-headline--line-height: 1.1;
+  --text-headline--letter-spacing: -0.02em;
+  --text-title: 1.25rem;
+  --text-title--line-height: 1.3;
+}
+
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scrollbar-color: var(--color-surface-3) var(--color-surface);
+    scrollbar-width: thin;
+  }
+
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    min-height: 100vh;
+    caret-color: var(--color-red);
+  }
+
+  h1, h2, h3 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  code, kbd {
+    font-family: var(--font-mono);
+  }
+
+  a {
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
+  }
+
+  ::selection {
+    background-color: var(--color-red);
+    color: white;
+  }
+
+  /* Visible keyboard focus everywhere; mouse clicks stay ring-free */
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 3px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--color-surface);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-surface-3);
+    border-radius: var(--radius-pill);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-muted);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+}
+
+@layer utilities {
+  /* Used by wrapped slides for the single hero element per slide. Not for page headings. */
+  .text-gradient-red {
+    background: linear-gradient(135deg, #e50914 0%, #ff6b6b 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .glass {
+    background: rgba(26, 26, 26, 0.8);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--color-border);
+  }
+
+  .card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+  }
+
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    min-height: 44px;
+    background: var(--color-red);
+    color: white;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    transition: background var(--duration-fast) var(--ease-smooth),
+                transform var(--duration-fast) var(--ease-smooth),
+                box-shadow var(--duration-fast) var(--ease-smooth);
+  }
+  .btn-primary:hover {
+    background: var(--color-red-hover);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-btn-hover);
+  }
+  .btn-primary:active {
+    transform: translateY(0);
+    box-shadow: none;
+  }
+  .btn-primary:disabled,
+  .btn-primary[aria-disabled="true"] {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    min-height: 44px;
+    background: var(--color-surface-2);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    transition: background var(--duration-fast) var(--ease-smooth),
+                border-color var(--duration-fast) var(--ease-smooth);
+  }
+  .btn-secondary:hover {
+    background: var(--color-surface-3);
+    border-color: var(--color-border-strong);
+  }
+
+  /*
+    Wrapped slide frame. Scrolls vertically when content is taller than the
+    frame (short phones) instead of clipping it. pan-y keeps vertical scroll
+    native while SlideShow's touch handlers read horizontal swipes.
+  */
+  .slide-container {
+    position: fixed;
+    inset: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    touch-action: pan-y pinch-zoom;
+    background: var(--color-bg);
+  }
+
+  /*
+    Scroll-safe vertical centering for a slide's content column. The two
+    spacers share the free space (content centered) and collapse when it runs
+    out, so overflow starts at the top and scrolls instead of being cut off
+    above the fold the way justify-content: center would. The top spacer never
+    drops below 56px so content always clears the exit button (12px + 44px).
+  */
+  .slide-stack {
+    display: flex;
+    flex-direction: column;
+  }
+  .slide-stack::before,
+  .slide-stack::after {
+    content: "";
+    flex: 1 0 0px;
+  }
+  .slide-stack::before {
+    min-height: calc(56px + env(safe-area-inset-top, 0px));
+  }
+  .slide-stack::after {
+    min-height: 16px;
+  }
+
+  /*
+    The one hero number on a wrapped slide. Every numeric hero uses this class.
+    Deliberately 22vw, not DESIGN.md's 14vw: at 14vw every phone (320-514px) sits
+    on the 4.5rem floor and 3-digit numbers look small in the frame; 22vw fills
+    ~83px at 375px and reaches the 8rem cap by ~580px, so desktop is unchanged.
+  */
+  .slide-hero {
+    font-size: clamp(4.5rem, 22vw, 8rem);
+    line-height: 0.95;
+    letter-spacing: -0.05em;
+    white-space: nowrap;
+  }
+  @media (max-height: 640px) {
+    .slide-hero {
+      font-size: clamp(3.75rem, 18vw, 6rem);
+    }
+  }
+  /*
+    Unit suffix inside a hero ("10h 45m", "72%"): the digits carry the joke,
+    units step down so long values fit 320px. Inherits the hero's gradient fill.
+  */
+  .slide-hero-unit {
+    font-size: 0.5em;
+    letter-spacing: -0.02em;
+    margin-left: 0.04em;
+  }
+
+  /*
+    Slideshow chrome (exit X, mobile Back on the last slide). A 44px veiled
+    circle so slide content scrolling under it never makes the icon illegible.
+    Blur here is functional, not decoration. Focus ring comes from :focus-visible.
+  */
+  .slide-chrome-btn {
+    width: 44px;
+    height: 44px;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-pill);
+    background: var(--color-bg-translucent);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-secondary);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: color var(--duration-fast) var(--ease-smooth),
+                border-color var(--duration-fast) var(--ease-smooth);
+  }
+  .slide-chrome-btn:hover,
+  .slide-chrome-btn[aria-expanded="true"] {
+    color: var(--color-text);
+    border-color: var(--color-border-strong);
+  }
+  .slide-chrome-btn:focus-visible {
+    border-radius: var(--radius-pill);
+  }
+
+  /*
+    Last slide's frame. On phones it ends 64px above the home-indicator inset
+    (12px offset + 44px Back + 8px gap) so the bottom-left Back control never
+    covers the card's CTAs. Desktop (md+) has the side Prev arrow instead.
+  */
+  .slide-last-reserve {
+    bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+  @media (min-width: 48rem) {
+    .slide-last-reserve {
+      bottom: env(safe-area-inset-bottom, 0px);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .btn-primary,
+    .btn-primary:hover {
+      transform: none;
+    }
+  }
+
+  /*
+    Forced colors (Windows High Contrast): transparent-fill text would vanish,
+    so gradient heroes fall back to the system text color.
+  */
+  @media (forced-colors: active) {
+    .text-gradient-red,
+    .text-gradient-red * {
+      background: none;
+      -webkit-background-clip: border-box;
+      background-clip: border-box;
+      -webkit-text-fill-color: CanvasText;
+      color: CanvasText;
+    }
+  }
+}

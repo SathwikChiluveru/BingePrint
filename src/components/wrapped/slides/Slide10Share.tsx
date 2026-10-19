@@ -1,0 +1,705 @@
+"use client";
+
+import { motion } from "framer-motion";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { isPendingInviteFresh, useAutoplayedStore } from "@/lib/store";
+import { renderShareImage } from "@/lib/share/renderShareImage";
+import { isInAppBrowser, safeInviteCode, toGroupSummary } from "@/lib/share/safety";
+import { suggestGroupName, suggestNickname } from "@/components/groups/memberStats";
+import {
+  INVITE_ACTIONS,
+  TEASER_DISCLOSURE,
+  createGroupErrorMessage,
+  inviteShareText,
+  inviteUrl,
+} from "@/lib/copy/invite";
+import { ShareCard, type ShareCardStats } from "../ShareCard";
+
+const SMOOTH = [0.4, 0, 0.2, 1] as const;
+const FILENAME = "autoplayed.png";
+const FALLBACK_GROUP_NAME = "My Autoplayed crew";
+
+interface Props {
+  stats: ShareCardStats;
+  // /wrapped/{sessionId} reads the viewer's own localStorage, so it is never offered as a share
+  // link; it is only used to come back here after sign-in.
+  sessionId?: string;
+  /** Back from sign-in with ?autoshare=1: start the group straight away, then offer "Share it now". */
+  autoCreate?: boolean;
+}
+
+type ShareState =
+  | { kind: "idle" }
+  | { kind: "busy" }
+  | { kind: "creating" }
+  | { kind: "createError"; message: string }
+  | { kind: "saved"; message: string }
+  // In-app browsers ignore downloads: the PNG is shown to press and hold instead.
+  | { kind: "preview"; message: string }
+  | { kind: "shared" }
+  | { kind: "blocked" }
+  | { kind: "error" };
+
+type AuthUser = { id: string; email?: string | null; user_metadata?: Record<string, unknown> | null };
+
+const RENDER_ERROR = "Couldn't make your card. Try again.";
+const BLOCKED_MESSAGE =
+  "Your card is ready, but sharing was blocked. We saved it to your downloads instead.";
+const PRESS_AND_HOLD = "Press and hold the card to save it.";
+// A slow or hung group check never holds the CTA longer than this.
+const GROUP_CHECK_TIMEOUT_MS = 8000;
+
+function ShareIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 3v12" />
+      <path d="m7 8 5-5 5 5" />
+      <path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
+    </svg>
+  );
+}
+
+/** "The Binge Lord" reads as "the Binge Lord" mid-sentence. */
+function midSentence(personality: string): string {
+  return personality.replace(/^The\s+/, "the ");
+}
+
+/** Share text for the card alone (no group code), in the roast voice: a dare, not a brag. */
+function cardShareText(personality: string): string {
+  return `Autoplayed says I'm ${midSentence(personality)}. Think you watch less Netflix than me? Run yours and prove it.`;
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  // Give the browser a tick to start the download before revoking.
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function isAbort(err: unknown): boolean {
+  return err instanceof DOMException && err.name === "AbortError";
+}
+
+async function loadUser(): Promise<AuthUser | null> {
+  try {
+    const {
+      data: { user },
+    } = await createClient().auth.getUser();
+    return user ?? null;
+  } catch {
+    return null;
+  }
+}
+
+interface Invite {
+  text: string;
+  url: string;
+}
+
+export function Slide10Share({ stats, sessionId, autoCreate = false }: Props) {
+  const router = useRouter();
+  const pendingInvite = useAutoplayedStore((s) => s.pendingInvite);
+  const myGroup = useAutoplayedStore((s) => s.myGroup);
+  const setMyGroup = useAutoplayedStore((s) => s.setMyGroup);
+  // Full stats for the group's wrapped_data; the card itself only needs the ShareCardStats subset
+  const wrappedStats = useAutoplayedStore((s) => s.wrappedStats);
+  const [share, setShare] = useState<ShareState>({ kind: "idle" });
+  // undefined while the session is being read
+  const [authUser, setAuthUser] = useState<AuthUser | null | undefined>(undefined);
+  // The myGroup id confirmed to still exist, so a deleted group's code never gets baked into the card
+  const [checkedGroupId, setCheckedGroupId] = useState<string | null>(null);
+  // The myGroup id whose check could not confirm it: ran past GROUP_CHECK_TIMEOUT_MS, failed to reach
+  // the server, or got 401/5xx. The card goes out without its code, but the stored group is kept and
+  // a late good answer can still confirm it.
+  const [unconfirmedGroupId, setUnconfirmedGroupId] = useState<string | null>(null);
+  // Name of the group this slide just created; switches the CTA to "Share it now"
+  const [createdName, setCreatedName] = useState<string | null>(null);
+
+  // An invite the user arrived through, for a group they have not made their own yet, wins:
+  // the comparison is what they came for. Otherwise a group of their own turns sharing into inviting.
+  const freshInvite =
+    isPendingInviteFresh(pendingInvite) && pendingInvite.code !== myGroup?.inviteCode
+      ? pendingInvite
+      : null;
+  const mode: "stackUp" | "invite" | "create" = freshInvite
+    ? "stackUp"
+    : myGroup
+      ? "invite"
+      : "create";
+  const groupConfirmed = mode === "invite" && !!myGroup && checkedGroupId === myGroup.id;
+  const groupUnconfirmed = mode === "invite" && !!myGroup && !groupConfirmed && unconfirmedGroupId === myGroup.id;
+  const waitingForGroup = mode === "invite" && !groupConfirmed && !groupUnconfirmed;
+  // Validated so a malformed stored code never reaches the card or a URL
+  const inviteCode = groupConfirmed ? safeInviteCode(myGroup?.inviteCode) : undefined;
+  const ownedByMe = myGroup?.ownedByMe === true;
+  // An empty history has nothing to compare: no group creation, no card, just a way to try again.
+  const emptyReel = !(Number(stats.totalEpisodesEstimate) > 0) && !(Number(stats.totalHours) > 0);
+
+  // Set synchronously at the start of a create, before any await, so a double tap makes one group
+  const creatingRef = useRef(false);
+  // Focus lands on "Share it now" once the group exists, so it never drops to <body>
+  const shareNowRef = useRef<HTMLButtonElement | null>(null);
+  // Object URL of the PNG shown in in-app browsers; revoked when replaced or on unmount
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!previewUrl) return;
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
+
+  useEffect(() => {
+    let current = true;
+    loadUser().then((u) => {
+      if (current) setAuthUser(u);
+    });
+    return () => {
+      current = false;
+    };
+  }, []);
+
+  // Confirm a stored group still exists before its code goes on the card. Only a 2xx confirms it;
+  // 404 forgets it; 401, 5xx, a network failure or a timeout leave it unconfirmed, so the card goes
+  // out without a code that might be dead.
+  useEffect(() => {
+    if (!myGroup || checkedGroupId === myGroup.id) return;
+    let current = true;
+    const id = myGroup.id;
+    const timer = setTimeout(() => {
+      if (current) setUnconfirmedGroupId(id);
+    }, GROUP_CHECK_TIMEOUT_MS);
+    fetch(`/api/groups/${encodeURIComponent(id)}`).then(
+      (res) => {
+        if (!current) return;
+        clearTimeout(timer);
+        if (res.ok) setCheckedGroupId(id);
+        else if (res.status === 404) setMyGroup(null);
+        else setUnconfirmedGroupId(id);
+      },
+      () => {
+        if (!current) return;
+        clearTimeout(timer);
+        setUnconfirmedGroupId(id);
+      }
+    );
+    return () => {
+      current = false;
+      clearTimeout(timer);
+    };
+  }, [myGroup, checkedGroupId, setMyGroup]);
+
+  // Pre-render the PNG so the click can call navigator.share synchronously. iOS Safari drops the
+  // tap's user activation across a slow await (or a network request) and rejects share().
+  const renderKey = `${inviteCode ?? ""}|${ownedByMe ? 1 : 0}`;
+  const [readyKey, setReadyKey] = useState<string | null>(null);
+  const blobReady = readyKey === renderKey;
+  const blobRef = useRef<Blob | null>(null);
+  const pendingRef = useRef<Promise<Blob> | null>(null);
+  useEffect(() => {
+    if (waitingForGroup || emptyReel) return;
+    let current = true;
+    blobRef.current = null;
+    const pending = renderShareImage(stats, { inviteCode, ownedByMe });
+    pendingRef.current = pending;
+    pending.then(
+      (blob) => {
+        if (!current) return;
+        blobRef.current = blob;
+        setReadyKey(renderKey);
+      },
+      () => {
+        // Retried on click.
+        if (current) pendingRef.current = null;
+      }
+    );
+    return () => {
+      current = false;
+    };
+  }, [stats, inviteCode, ownedByMe, renderKey, waitingForGroup, emptyReel]);
+
+  function goToSignIn() {
+    const back = sessionId ? `/wrapped/${sessionId}?autoshare=1` : "/groups?mode=create";
+    router.push(`/auth/login?next=${encodeURIComponent(back)}`);
+  }
+
+  /** One tap: create the group with this user as its first member, then re-render the card with the code. */
+  /** Caller holds creatingRef; returns true when the group exists and has this user's stats. */
+  async function createGroup(user: AuthUser): Promise<boolean> {
+    setShare({ kind: "creating" });
+    let res: Response;
+    try {
+      res = await fetch("/api/groups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: suggestGroupName(stats.personality) || FALLBACK_GROUP_NAME,
+          nickname: suggestNickname(user) || "Me",
+          // Summary only: the per-binge session list never leaves the device
+          wrapped_data: toGroupSummary(wrappedStats ?? stats),
+          // The invite page shows the owner's personality as a hook; the server builds that teaser
+          // from wrapped_data. Disclosed in the helper line under the button.
+          share_teaser: true,
+        }),
+      });
+    } catch {
+      setShare({ kind: "createError", message: createGroupErrorMessage(0) });
+      return false;
+    }
+    if (res.status === 401) {
+      setShare({ kind: "idle" });
+      goToSignIn();
+      return false;
+    }
+    let group: { id?: unknown; invite_code?: unknown; name?: unknown; warning?: unknown } | null = null;
+    try {
+      group = await res.json();
+    } catch {
+      group = null;
+    }
+    const code = safeInviteCode(group?.invite_code);
+    // Any non-2xx, a "created but your stats weren't added" warning, or a malformed body is a failure:
+    // the card only ever carries a group that really has this user in it.
+    if (!res.ok || !group || group.warning || typeof group.id !== "string" || !code) {
+      setShare({ kind: "createError", message: createGroupErrorMessage(res.status) });
+      return false;
+    }
+    const name = typeof group.name === "string" && group.name ? group.name : FALLBACK_GROUP_NAME;
+    setCheckedGroupId(group.id);
+    setMyGroup({ id: group.id, inviteCode: code, name, ownedByMe: true });
+    setCreatedName(name);
+    setShare({ kind: "idle" });
+    return true;
+  }
+
+  async function runCreate(knownUser?: AuthUser | null) {
+    if (creatingRef.current) return;
+    creatingRef.current = true;
+    try {
+      const user = knownUser !== undefined ? knownUser : await loadUser();
+      if (!user) {
+        goToSignIn();
+        return;
+      }
+      await createGroup(user);
+    } finally {
+      creatingRef.current = false;
+    }
+  }
+
+  function handleCreateAndInvite() {
+    // Guarded inside runCreate before its first await; this check just skips a no-op render.
+    if (creatingRef.current) return;
+    void runCreate(authUser);
+  }
+
+  // Card shared with no group yet: the next step is starting one, so the CTA takes focus
+  const createRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    if (share.kind === "shared" && mode === "create") createRef.current?.focus();
+  }, [share.kind, mode]);
+
+  // Move focus to "Share it now" as soon as it mounts after a create
+  useEffect(() => {
+    if (createdName) shareNowRef.current?.focus();
+  }, [createdName]);
+
+  // Back from sign-in: run the creation the user already asked for. The share sheet still needs a
+  // fresh tap ("Share it now"), because the network request ends the original tap's activation.
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (!autoCreate || autoStarted.current || authUser === undefined || mode !== "create" || emptyReel) return;
+    autoStarted.current = true;
+    if (authUser) queueMicrotask(() => void runCreate(authUser));
+    // createGroup reads current props and store values; this runs once per mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoCreate, authUser, mode, emptyReel]);
+
+  const personalityName = stats.personality?.trim() || "The Casual Viewer";
+
+  function inviteData(): Invite | null {
+    if (!inviteCode) return null;
+    // The code rides in the text too, so it survives apps that drop the link.
+    return {
+      text: inviteShareText({
+        code: inviteCode,
+        groupName: myGroup?.name?.trim() || (ownedByMe ? "my group" : "our group"),
+        personality: personalityName,
+      }),
+      url: inviteUrl(inviteCode),
+    };
+  }
+
+  /** In-app browsers: show the PNG to press and hold, and copy the invite link (best effort). */
+  function previewFallback(blob: Blob, invite: Invite | null) {
+    setPreviewUrl(URL.createObjectURL(blob));
+    if (invite && navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(`${invite.text} ${invite.url}`).then(
+        () => setShare({ kind: "preview", message: `${PRESS_AND_HOLD} Invite link copied.` }),
+        () => setShare({ kind: "preview", message: PRESS_AND_HOLD })
+      );
+      return;
+    }
+    setShare({ kind: "preview", message: PRESS_AND_HOLD });
+  }
+
+  /** Saves the PNG, and copies the invite link when there is one (best effort). */
+  function saveFallback(blob: Blob, invite: Invite | null, kind: "saved" | "blocked") {
+    // A blob download silently does nothing in most in-app browsers, so never claim it worked there.
+    if (isInAppBrowser()) {
+      previewFallback(blob, invite);
+      return;
+    }
+    downloadBlob(blob, FILENAME);
+    if (kind === "blocked") {
+      setShare({ kind: "blocked" });
+      return;
+    }
+    if (invite && navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(`${invite.text} ${invite.url}`).then(
+        () => setShare({ kind: "saved", message: "Card saved to your downloads. Invite link copied." }),
+        () => setShare({ kind: "saved", message: "Card saved to your downloads." })
+      );
+      return;
+    }
+    setShare({ kind: "saved", message: "Card saved to your downloads." });
+  }
+
+  /**
+   * Must reach navigator.share() before any await when called from a click, so it stays inside
+   * the user activation window.
+   */
+  function deliver(blob: Blob) {
+    const invite = inviteData();
+    const file = new File([blob], FILENAME, { type: "image/png" });
+    // No code (no group, or an unconfirmed one): the card still travels with a dare and a way in.
+    const message = invite ?? { text: cardShareText(personalityName), url: window.location.origin };
+    const full: ShareData = { files: [file], title: "My Autoplayed reel", ...message };
+    const filesOnly: ShareData = { files: [file], title: "My Autoplayed reel" };
+    const data =
+      typeof navigator.canShare === "function"
+        ? navigator.canShare(full)
+          ? full
+          : navigator.canShare(filesOnly)
+            ? filesOnly
+            : null
+        : null;
+
+    if (!data) {
+      saveFallback(blob, invite, "saved");
+      return;
+    }
+
+    setShare({ kind: "busy" });
+    navigator.share(data).then(
+      () => setShare({ kind: "shared" }),
+      (err: unknown) => {
+        // User closed the share sheet: not an error, just go back to idle.
+        if (isAbort(err)) {
+          setShare({ kind: "idle" });
+          return;
+        }
+        // NotAllowedError (activation lost) or any other refusal: the card exists, so save it.
+        saveFallback(blob, invite, "blocked");
+      }
+    );
+  }
+
+  function handleShare() {
+    // Taps while the card is still rendering fall through to render-on-click, which also
+    // recovers when the background render failed.
+    if (share.kind === "busy" || share.kind === "creating" || waitingForGroup) return;
+    const ready = blobRef.current;
+    if (ready && blobReady) {
+      deliver(ready);
+      return;
+    }
+    // Not rendered yet (or the render failed): render now. If the browser then refuses the
+    // late share() call, deliver() falls back to a download.
+    setShare({ kind: "busy" });
+    const pending = pendingRef.current ?? renderShareImage(stats, { inviteCode, ownedByMe });
+    pendingRef.current = pending;
+    pending.then(
+      (blob) => {
+        blobRef.current = blob;
+        deliver(blob);
+      },
+      () => {
+        pendingRef.current = null;
+        setShare({ kind: "error" });
+      }
+    );
+  }
+
+  const busy = share.kind === "busy";
+  const creating = share.kind === "creating";
+  const preparing = waitingForGroup || (createdName !== null && !blobReady);
+  const pendingLabel = waitingForGroup ? "Checking your group…" : "Making your card…";
+  const statusText =
+    share.kind === "busy"
+      ? "Making your card…"
+      : creating
+        ? "Starting your group…"
+        : share.kind === "saved" || share.kind === "preview"
+          ? share.message
+          : share.kind === "shared"
+            ? mode === "create"
+              ? "Card shared. Now start a group? Friends can join with its code."
+              : "Card shared"
+            : createdName && blobReady
+              ? `${createdName} is ready. Your card now carries its invite code.`
+              : createdName
+                ? `${createdName} is ready. Making your card with its invite code…`
+                : "";
+
+  const shareLabel = createdName
+    ? "Share it now"
+    : groupConfirmed && inviteCode
+      ? INVITE_ACTIONS.shareCardInvite
+      : INVITE_ACTIONS.shareCard;
+  // aria-disabled rather than disabled, so "Share it now" can hold focus straight after a create;
+  // handleShare ignores taps while busy or until a stored group is checked.
+  const shareButton = (primary: boolean) => (
+    <button
+      ref={primary ? shareNowRef : undefined}
+      type="button"
+      onClick={handleShare}
+      aria-disabled={busy || waitingForGroup || undefined}
+      aria-busy={busy || preparing}
+      {...(primary ? { "data-slide-primary": "" } : {})}
+      className={`${primary ? "btn-primary" : "btn-secondary"} w-full gap-2 px-6 py-3 aria-disabled:opacity-60 aria-disabled:cursor-wait`}
+    >
+      <ShareIcon />
+      {busy || preparing ? pendingLabel : shareLabel}
+    </button>
+  );
+
+  // Codes and ids go through validation and encoding, never straight into a URL
+  const stackUpCode = freshInvite ? safeInviteCode(freshInvite.code) : undefined;
+  const stackUpHref = freshInvite
+    ? freshInvite.groupId
+      ? `/groups/${encodeURIComponent(freshInvite.groupId)}`
+      : stackUpCode
+        ? `/groups?join=${encodeURIComponent(stackUpCode)}`
+        : "/groups?mode=join"
+    : null;
+
+  // A route into the group once one exists (after a create, after sharing, or an invite already
+  // stored). Shown once the check settled or timed out, so a deleted group never flashes a link.
+  const groupLinkReady = !!myGroup && (checkedGroupId === myGroup.id || unconfirmedGroupId === myGroup.id);
+  const groupHref = myGroup ? `/groups/${encodeURIComponent(myGroup.id)}` : null;
+  const groupName = myGroup?.name?.trim() || "your group";
+  // After "Card shared" the group is the obvious next step, so the link steps up to a button.
+  const groupLinkPromoted = share.kind === "shared";
+  const groupLink =
+    groupLinkReady && groupHref ? (
+      <Link
+        href={groupHref}
+        className={
+          groupLinkPromoted
+            ? "btn-secondary w-full px-6 py-3"
+            : "self-center inline-flex items-center min-h-[44px] px-3 text-sm underline-offset-4 hover:underline"
+        }
+        style={groupLinkPromoted ? undefined : { color: "var(--color-text-secondary)" }}
+      >
+        Open {groupName}
+      </Link>
+    ) : null;
+
+  if (emptyReel) {
+    return (
+      <div className="slide-container slide-stack items-center px-6 md:px-12">
+        <div className="relative w-full max-w-sm flex flex-col items-center text-center">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 -top-16 h-56"
+            style={{ background: "var(--glow-hero)" }}
+          />
+          <motion.h2
+            className="relative text-display font-black"
+            style={{ color: "var(--color-text)", textWrap: "balance" }}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: SMOOTH }}
+          >
+            Nothing to share yet
+          </motion.h2>
+          <motion.p
+            className="relative mt-4 text-base max-w-xs"
+            style={{ color: "var(--color-text-secondary)", textWrap: "pretty" }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4, delay: 0.2, ease: SMOOTH }}
+          >
+            Your file had no viewing history in it, so there is no card to brag with. Grab a fresh
+            export from Netflix and run it again.
+          </motion.p>
+          <motion.div
+            className="relative mt-8 w-full flex flex-col gap-3"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.35, ease: SMOOTH }}
+          >
+            <Link href="/upload" data-slide-primary="" className="btn-primary w-full px-6 py-3">
+              Upload my history
+            </Link>
+            {groupLink ?? (
+              <Link
+                href="/groups?mode=join"
+                className="self-center inline-flex items-center min-h-[44px] px-3 text-sm underline-offset-4 hover:underline"
+                style={{ color: "var(--color-text-secondary)" }}
+              >
+                Join with a code
+              </Link>
+            )}
+          </motion.div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="slide-container slide-stack items-center px-4 md:px-12">
+      <div className="w-full max-w-sm flex flex-col items-center text-center">
+        {previewUrl && share.kind === "preview" ? (
+          // The rendered PNG itself, so press-and-hold saves the real card in in-app browsers
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={previewUrl}
+            alt={`Your Autoplayed card: ${stats.personality?.trim() || "The Casual Viewer"}. ${PRESS_AND_HOLD}`}
+            width={1080}
+            height={1920}
+            className="h-auto w-auto max-w-full max-h-[52vh] rounded-[20px] short:max-h-[44vh]"
+            style={{ border: "1px solid var(--color-border-strong)", WebkitTouchCallout: "default" }}
+          />
+        ) : (
+          <ShareCard stats={stats} inviteCode={inviteCode} ownedByMe={ownedByMe} />
+        )}
+
+        <motion.div
+          className="mt-5 w-full flex flex-col gap-3 short:mt-3 short:gap-2"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.5, ease: SMOOTH }}
+        >
+          {mode === "create" && (
+            <p className="text-base font-semibold short:hidden" style={{ color: "var(--color-text)" }}>
+              Think your friends watch less? Prove it.
+            </p>
+          )}
+
+          {mode === "stackUp" && stackUpHref && freshInvite ? (
+            <>
+              <Link href={stackUpHref} data-slide-primary="" className="btn-primary w-full px-6 py-3">
+                See how you stack up in {freshInvite.groupName ?? "your group"}
+              </Link>
+              {shareButton(false)}
+            </>
+          ) : mode === "create" ? (
+            <>
+              {/* The one red thing on this slide: makes the group, then the card carries its code */}
+              <button
+                ref={createRef}
+                type="button"
+                onClick={handleCreateAndInvite}
+                disabled={creating}
+                aria-busy={creating}
+                data-slide-primary=""
+                className="btn-primary w-full gap-2 px-6 py-3 disabled:opacity-60 disabled:cursor-wait"
+              >
+                <ShareIcon />
+                {creating ? "Starting your group…" : INVITE_ACTIONS.startGroup}
+              </button>
+              <p className="text-sm leading-snug" style={{ color: "var(--color-muted)", textWrap: "pretty" }}>
+                {TEASER_DISCLOSURE}
+                {authUser === null && " One quick sign-in first."}
+              </p>
+              {/*
+                One secondary row. Joining stays a real button, not a footnote: someone holding a
+                friend's code must not start a rival group by default. Sharing the card alone is the
+                quiet option beside it.
+              */}
+              <div className="flex items-stretch gap-2">
+                <Link
+                  href="/groups?mode=join"
+                  className="btn-secondary flex-1 min-w-0 min-h-[44px] px-4 py-2 text-center text-sm leading-tight"
+                >
+                  Join a friend&rsquo;s group
+                </Link>
+                <button
+                  type="button"
+                  onClick={handleShare}
+                  disabled={busy || creating}
+                  className="shrink-0 inline-flex items-center justify-center min-h-[44px] px-3 text-sm underline-offset-4 hover:underline disabled:opacity-60"
+                  style={{ color: "var(--color-text-secondary)" }}
+                >
+                  {busy ? "Making your card…" : INVITE_ACTIONS.shareCard}
+                </button>
+              </div>
+            </>
+          ) : (
+            shareButton(true)
+          )}
+
+          <p className="sr-only" aria-live="polite" aria-atomic="true">
+            {statusText}
+          </p>
+          {createdName && blobReady && share.kind === "idle" && (
+            <p className="text-sm" style={{ color: "var(--color-success)" }} aria-hidden="true">
+              {statusText}
+            </p>
+          )}
+          {(share.kind === "saved" || share.kind === "shared" || share.kind === "preview") && (
+            <p className="text-sm" style={{ color: "var(--color-success)" }} aria-hidden="true">
+              {statusText}
+            </p>
+          )}
+          {share.kind === "blocked" && (
+            <p role="status" className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+              {BLOCKED_MESSAGE}
+            </p>
+          )}
+          {share.kind === "error" && (
+            <p role="alert" className="text-sm" style={{ color: "var(--color-red-text)" }}>
+              {RENDER_ERROR}
+            </p>
+          )}
+          {share.kind === "createError" && (
+            <p role="alert" className="text-sm" style={{ color: "var(--color-red-text)" }}>
+              {share.message}
+            </p>
+          )}
+
+          {groupLink}
+
+          {/*
+            Overflow, not an action: hidden on short screens, and in create mode below md so the
+            phone layout stays card, tease, CTA, disclosure, one secondary row.
+          */}
+          <Link
+            href="/upload"
+            className={`self-center items-center min-h-[44px] px-3 text-sm underline-offset-4 hover:underline short:hidden! ${mode === "create" ? "hidden md:inline-flex" : "inline-flex"}`}
+            style={{ color: "var(--color-muted)" }}
+          >
+            Upload a different file
+          </Link>
+        </motion.div>
+      </div>
+    </div>
+  );
+}

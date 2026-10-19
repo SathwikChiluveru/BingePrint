@@ -1,0 +1,76 @@
+/* Autoplayed Design Tokens — Netflix × Apple */
+:root {
+  color-scheme: dark;
+
+  /* Colors */
+  --color-bg: #141414;
+  --color-bg-translucent: rgba(20, 20, 20, 0.92);
+  --color-surface: #1a1a1a;
+  --color-surface-2: #242424;
+  --color-surface-3: #2e2e2e;
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-strong: rgba(255, 255, 255, 0.16);
+
+  --color-red: #e50914;
+  --color-red-hover: #f40612;
+  --color-red-subtle: rgba(229, 9, 20, 0.15);
+  --color-red-border: rgba(229, 9, 20, 0.35);
+  /* Brand red tuned for small text on dark surfaces (≥4.5:1 on --color-bg / --color-surface) */
+  --color-red-text: #ff4d55;
+
+  --color-text: #ffffff;
+  --color-text-secondary: #b3b3b3;
+  /* Was #737373 (3.9:1 on --color-bg, fails AA for small text); now ≥5:1 on bg and surface */
+  --color-muted: #8c8c8c;
+
+  --color-success: #46d369;
+  --color-warning: #f5a623;
+
+  --color-focus: #ffffff;
+
+  /* Neutral fill for bar tracks and relative-share bars on slides (never red) */
+  --color-track: rgba(255, 255, 255, 0.05);
+  /* Brighter neutral for the highlighted bar in a neutral set (e.g. peak weekday) */
+  --color-track-strong: rgba(255, 255, 255, 0.55);
+
+  /* Typography */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  --font-display: var(--font-sans);
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-24: 96px;
+
+  /* Radii */
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-pill: 9999px;
+
+  /* Shadows */
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.4);
+  --shadow-btn-hover: 0 10px 28px -10px rgba(229, 9, 20, 0.65);
+  --shadow-glow-red: 0 0 40px rgba(229, 9, 20, 0.3);
+  --shadow-glow-subtle: 0 0 60px rgba(229, 9, 20, 0.1);
+
+  /* The one glow source per wrapped slide, centered behind the hero (Spotlight Rule) */
+  --glow-hero: radial-gradient(ellipse 60% 50% at 50% 50%, rgba(229, 9, 20, 0.15) 0%, transparent 70%);
+
+  /* Transitions */
+  /* The slide-hero spring (0.34, 1.56, 0.64, 1) is a framer-motion constant in the slide
+     components, not a token here: no stylesheet uses it, and UI chrome never overshoots. */
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 150ms;
+  --duration-base: 250ms;
+  --duration-slow: 400ms;
+}
