@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAutoplayedStore, useMyGroupNeedsUpdate } from "@/lib/store";
 import { fetchMyGroups, type MyGroupSummary } from "@/lib/supabase/groups";
+import { createClient } from "@/lib/supabase/client";
 import { ArrowRightIcon } from "./icons";
 
 type State =
@@ -31,9 +32,15 @@ export default function MyGroupsList() {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetchMyGroups({ signal: controller.signal }).then((result) => {
+    // No local session means signed out: skip the request so visitors don't log a 401 every visit
+    createClient()
+      .auth.getSession()
+      .then(({ data }) => (data.session ? fetchMyGroups({ signal: controller.signal }) : null))
+      .then((result) => {
       if (controller.signal.aborted) return;
-      if (result.ok) {
+      if (result === null) {
+        setState({ kind: "hidden" });
+      } else if (result.ok) {
         setState(result.groups.length > 0 ? { kind: "ready", groups: result.groups } : { kind: "hidden" });
       } else if (result.reason === "signed-out") {
         setState({ kind: "hidden" });
