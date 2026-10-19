@@ -22,6 +22,14 @@ function Icon({ size = 18, children, ...rest }: IconProps & { children: React.Re
   );
 }
 
+export function ArrowRightIcon(props: IconProps) {
+  return (
+    <Icon strokeWidth={2.5} {...props}>
+      <path d="M5 12h14M13 6l6 6-6 6" />
+    </Icon>
+  );
+}
+
 export function LockIcon(props: IconProps) {
   return (
     <Icon {...props}>

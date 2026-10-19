@@ -26,17 +26,9 @@ type SampleSlide = {
 
 /**
  * Sample stats from the owner's own quick export (testdata); the roommate row is a made-up sample.
- * Always labeled as a sample. The reel opens (and rests, under reduced motion) on the group frame
- * because groups are the point.
+ * Always labeled as a sample. The reel builds through the solo stats and lands on the group frame.
  */
 const SLIDES: SampleSlide[] = [
-  {
-    label: "Your group",
-    hero: `You ${SAMPLE_VERSUS[0].value} vs Roommate ${SAMPLE_VERSUS[1].value}`,
-    kind: "versus",
-    versus: SAMPLE_VERSUS,
-    line: SAMPLE_VERSUS_LINE,
-  },
   {
     label: "Titles watched",
     hero: "5,626",
@@ -61,6 +53,13 @@ const SLIDES: SampleSlide[] = [
     hero: "The Binge Lord",
     kind: "word",
     line: "One more episode? You've never told that lie in your life.",
+  },
+  {
+    label: "Your group",
+    hero: `You ${SAMPLE_VERSUS[0].value} vs Roommate ${SAMPLE_VERSUS[1].value}`,
+    kind: "versus",
+    versus: SAMPLE_VERSUS,
+    line: SAMPLE_VERSUS_LINE,
   },
 ];
 
@@ -108,13 +107,11 @@ export function SampleReel() {
   return (
     <MotionConfig reducedMotion="user">
       <div ref={rootRef} className="relative mx-auto w-[min(72vw,280px)] md:w-[280px] xl:w-[340px] 2xl:w-[360px]">
-        {/*
-          The one glow source in the hero, centered on the reel; the glass frame blurs it.
-          Neutral, not red: the red on this screen belongs to the Choose file button.
-        */}
+        {/* The one glow source in the hero: red light behind the reel that the glass frame blurs */}
         <div
           aria-hidden="true"
-          className={`pointer-events-none absolute -inset-x-[60%] -inset-y-[25%] ${styles.neutralGlow}`}
+          className="pointer-events-none absolute -inset-x-[60%] -inset-y-[25%]"
+          style={{ background: "var(--glow-hero)" }}
         />
 
         <motion.figure
@@ -240,11 +237,10 @@ export function SampleReel() {
                       <motion.p
                         className={
                           slide.kind === "number"
-                            ? "mt-3 whitespace-nowrap text-5xl font-black tabular-nums min-[360px]:text-6xl lg:text-7xl 2xl:text-8xl"
-                            : "mt-4 text-3xl font-black min-[360px]:text-4xl lg:text-5xl"
+                            ? "text-gradient-red mt-3 whitespace-nowrap text-5xl font-black tabular-nums min-[360px]:text-6xl lg:text-7xl 2xl:text-8xl"
+                            : "text-gradient-red mt-4 text-3xl font-black min-[360px]:text-4xl lg:text-5xl"
                         }
                         style={{
-                          color: "var(--color-text)",
                           lineHeight: 0.95,
                           letterSpacing: slide.kind === "number" ? "-0.04em" : "-0.03em",
                           textWrap: "balance",
