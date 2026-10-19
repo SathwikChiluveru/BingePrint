@@ -270,7 +270,10 @@ export default function UploadPage() {
           </section>
 
           <p className="mt-8 text-center text-xs" style={{ color: "var(--color-muted)" }}>
-            Autoplayed is not affiliated with Netflix, Inc.
+            Autoplayed is not affiliated with Netflix, Inc. ·{" "}
+            <Link href="/privacy" className="underline underline-offset-4 hover:text-white">
+              Privacy
+            </Link>
           </p>
         </motion.div>
       </main>

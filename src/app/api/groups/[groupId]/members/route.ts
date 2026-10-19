@@ -29,20 +29,19 @@ export async function POST(
     return NextResponse.json({ error: "Group not found" }, { status: 404 });
   }
 
+  const supabase = await createClient();
+
   // Rate limit: 5 joins per IP per minute
-  const { success } = rateLimit(`join:${clientIp(request)}`, 5, 60_000);
-  if (!success) {
+  if (!(await rateLimit(supabase, `join:${clientIp(request)}`, 5, 60_000)).success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
-
-  const supabase = await createClient();
 
   // Joining needs an account so each person holds one spot per group
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Sign in to join this group" }, { status: 401 });
   }
-  if (!rateLimit(`join-user:${user.id}`, 5, 60_000).success) {
+  if (!(await rateLimit(supabase, `join-user:${user.id}`, 5, 60_000)).success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
@@ -72,6 +71,9 @@ export async function POST(
     }
     if (error.code === "PT422") {
       return NextResponse.json({ error: "Invalid nickname or stats" }, { status: 422 });
+    }
+    if (error.code === "PT429") {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
     }
     return NextResponse.json({ error: "Couldn't join the group" }, { status: 500 });
   }

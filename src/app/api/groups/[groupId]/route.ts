@@ -47,7 +47,7 @@ export async function GET(
   if (!hasCode) {
     return NextResponse.json({ error: "Group not found" }, { status: 404, headers: noStore });
   }
-  if (!rateLimit(`lookup:${clientIp(request)}`, 20, 60_000).success) {
+  if (!(await rateLimit(supabase, `lookup:${clientIp(request)}`, 20, 60_000)).success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: noStore });
   }
 

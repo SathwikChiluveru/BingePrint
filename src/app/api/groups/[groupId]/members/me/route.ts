@@ -30,16 +30,15 @@ export async function PUT(
     return NextResponse.json({ error: "Group not found" }, { status: 404 });
   }
 
-  if (!rateLimit(`update-ip:${clientIp(request)}`, 10, 60_000).success) {
+  const supabase = await createClient();
+  if (!(await rateLimit(supabase, `update-ip:${clientIp(request)}`, 10, 60_000)).success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
-
-  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Sign in to update your stats" }, { status: 401 });
   }
-  if (!rateLimit(`update-user:${user.id}`, 5, 60_000).success) {
+  if (!(await rateLimit(supabase, `update-user:${user.id}`, 5, 60_000)).success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 

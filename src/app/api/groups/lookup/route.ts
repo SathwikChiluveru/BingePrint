@@ -12,7 +12,8 @@ const noStore = { "Cache-Control": "no-store" };
 // here per IP, then in the database (migration 003: per hashed client key + a global ceiling;
 // signed-in users go through group_by_invite_code's per-user limit instead).
 export async function GET(request: NextRequest) {
-  if (!rateLimit(`lookup:${clientIp(request)}`, 20, 60_000).success) {
+  const supabase = await createClient();
+  if (!(await rateLimit(supabase, `lookup:${clientIp(request)}`, 20, 60_000)).success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: noStore });
   }
 
@@ -21,7 +22,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Invalid invite code" }, { status: 400, headers: noStore });
   }
 
-  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
   const result = await lookupByInviteCode(supabase, code, { signedIn: !!user, clientKey: clientKey(request) });

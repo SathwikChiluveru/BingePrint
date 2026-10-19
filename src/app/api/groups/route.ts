@@ -33,7 +33,7 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: noStore });
   }
 
-  if (!rateLimit(`my-groups:${user.id}`, 60, 60_000).success) {
+  if (!(await rateLimit(supabase, `my-groups:${user.id}`, 60, 60_000)).success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: noStore });
   }
 
@@ -71,7 +71,10 @@ export async function POST(request: NextRequest) {
   }
 
   // 10 groups per user per 10 minutes; also guards against double-taps creating twin groups
-  if (!rateLimit(`create:${user.id}`, 10, 600_000).success || !rateLimit(`create-ip:${clientIp(request)}`, 20, 600_000).success) {
+  if (
+    !(await rateLimit(supabase, `create:${user.id}`, 10, 600_000)).success ||
+    !(await rateLimit(supabase, `create-ip:${clientIp(request)}`, 20, 600_000)).success
+  ) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 

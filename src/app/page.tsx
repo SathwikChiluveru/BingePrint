@@ -117,7 +117,12 @@ export default function LandingPage() {
           <span className="font-black" style={{ color: "var(--color-red)", letterSpacing: "-0.02em" }}>
             Autoplayed
           </span>
-          <p>Autoplayed is not affiliated with Netflix, Inc.</p>
+          <p>
+            Autoplayed is not affiliated with Netflix, Inc. ·{" "}
+            <Link href="/privacy" className="underline underline-offset-4 hover:text-white">
+              Privacy
+            </Link>
+          </p>
         </div>
       </footer>
     </div>

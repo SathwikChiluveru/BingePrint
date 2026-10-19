@@ -373,12 +373,18 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <div
-      className="min-h-screen flex items-center justify-center px-4"
+      className="min-h-screen flex flex-col items-center justify-center gap-6 px-4 py-8"
       style={{ background: "var(--color-bg)" }}
     >
       <Suspense>
         <LoginForm />
       </Suspense>
+      <p className="text-center text-xs" style={{ color: "var(--color-muted)" }}>
+        Autoplayed is not affiliated with Netflix, Inc. ·{" "}
+        <Link href="/privacy" className="underline underline-offset-4 hover:text-white">
+          Privacy
+        </Link>
+      </p>
     </div>
   );
 }
