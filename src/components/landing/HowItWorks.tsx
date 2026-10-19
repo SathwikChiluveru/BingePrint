@@ -134,7 +134,7 @@ const steps: Step[] = [
     artifact: <ExportArtifact />,
   },
   {
-    title: "Drop the file in",
+    title: "Add the file",
     body: (
       <>
         Autoplayed reads it on your device and keeps only the computed stats. Those go to our server only if you

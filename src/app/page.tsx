@@ -114,7 +114,8 @@ export default function LandingPage() {
         style={{ color: "var(--color-muted)", borderTop: "1px solid var(--color-border)" }}
       >
         <div className="mx-auto flex max-w-6xl flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-          <span className="font-black" style={{ color: "var(--color-red)", letterSpacing: "-0.02em" }}>
+          {/* Small red text uses the lighter red so it passes 4.5:1 on the dark ground */}
+          <span className="font-black" style={{ color: "var(--color-red-text)", letterSpacing: "-0.02em" }}>
             Autoplayed
           </span>
           <p>

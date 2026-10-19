@@ -101,7 +101,7 @@ export default function UploadPage() {
               </p>
             )}
             <p className="mt-2" style={{ color: "var(--color-text-secondary)" }}>
-              Drop in your Netflix viewing history CSV. It is read in your browser and never uploaded.
+              Add your Netflix viewing history CSV. It is read in your browser and never uploaded.
             </p>
           </div>
 
@@ -176,6 +176,16 @@ export default function UploadPage() {
             )}
           </AnimatePresence>
 
+          {/* Most first-timers arrive without the file yet: point them at the steps right away */}
+          {state !== "parsing" && (
+            <p className="mt-3 text-center text-sm" style={{ color: "var(--color-text-secondary)" }}>
+              No file yet?{" "}
+              <a href="#howto-heading" className="underline" style={{ color: "var(--color-text)" }}>
+                Get it from Netflix in about 30 seconds
+              </a>
+            </p>
+          )}
+
           {notice && (
             <p role="status" className="mt-3 text-sm text-center break-words" style={{ color: "var(--color-text-secondary)" }}>
               {notice}
@@ -235,7 +245,9 @@ export default function UploadPage() {
                   >
                     netflix.com/viewingactivity
                   </a>{" "}
-                  (pick your profile if asked)
+                  (pick your profile if asked).{" "}
+                  <strong style={{ color: "var(--color-text)" }}>Use a web browser, not the Netflix app:</strong>{" "}
+                  the app has no download button.
                 </li>
                 <li>
                   Scroll to the bottom and click <strong style={{ color: "var(--color-text)" }}>Download all</strong>

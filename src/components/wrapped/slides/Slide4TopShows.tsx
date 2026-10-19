@@ -42,15 +42,17 @@ function topShowsShare(shows: ShowStat[], totalTitles: number): number {
 }
 
 /**
- * Sets the top list against how many titles got a try. uniqueShowsCount counts movies as well as
- * shows, so the copy says "titles". The share itself is the hero, so it is not repeated, and the
- * list is named once ("your top 5" under the hero), never echoed here.
+ * Sets the top list against how many different shows and movies got a try. "Titles" elsewhere in
+ * the reel means plays (slide 2, the card), so this counts distinct items as "shows and movies" to
+ * keep the two numbers from looking inconsistent. The list is named once ("your top 5").
  */
 function topShowsQuip(n: number, uniqueTitles: number): string {
   if (uniqueTitles <= n) {
-    return `Only ${uniqueTitles.toLocaleString()} ${uniqueTitles === 1 ? "title" : "titles"} entered. Not much of a contest.`;
+    return uniqueTitles === 1
+      ? "Only 1 show or movie. Not much of a contest."
+      : `Only ${uniqueTitles.toLocaleString()} different shows and movies. Not much of a contest.`;
   }
-  return `${uniqueTitles.toLocaleString()} titles tried. The rest never stood a chance.`;
+  return `${uniqueTitles.toLocaleString()} different shows and movies tried. The rest never stood a chance.`;
 }
 
 export function Slide4TopShows({ stats }: Props) {

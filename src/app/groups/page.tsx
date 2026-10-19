@@ -348,10 +348,7 @@ function GroupsContent() {
     <PageShell>
       {mode === "choose" && (
         <motion.div className="flex flex-col" {...enter}>
-          <h1
-            className="font-black"
-            style={{ fontSize: "clamp(2.25rem, 8vw, 3.5rem)", lineHeight: 0.98, letterSpacing: "-0.03em", textWrap: "balance" }}
-          >
+          <h1 className="text-display font-black" style={{ textWrap: "balance" }}>
             Someone in your group chat has a problem.
           </h1>
           <p className="mt-4 text-lg" style={{ color: "var(--color-text-secondary)" }}>
