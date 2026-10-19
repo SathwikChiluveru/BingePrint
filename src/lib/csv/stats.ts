@@ -280,6 +280,12 @@ function funComparison(totalHours: number, estimated: boolean, totalTitles: numb
   return `${lead}Netflix is still working out whether you're a real person.`;
 }
 
+/** Local calendar day plus title: one sitting of a title, however many times it was resumed. */
+function titleDayKey(e: NetflixEntry): string {
+  const d = e.startTime;
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}|${e.title.trim()}`;
+}
+
 /** Persisted stats come back from JSON with dates as strings; returns null when unusable. */
 export function toValidDate(value: unknown): Date | null {
   if (value == null) return null;
@@ -308,6 +314,9 @@ export function computeWrappedStats(entries: NetflixEntry[]): WrappedStats {
   // the exact play count there and only use estimated seconds to break ties.
   // A "show" made of one distinct title that the namer left whole has no episode structure:
   // it is a movie (watched once or rewatched), so the copy says "watches", not "episodes".
+  // Timed exports log a new row every time a title is resumed, so plays count each title once per
+  // calendar day there and "N episodes of X" stays honest. Date-only exports already have one row
+  // per title per day, so their row count is the play count.
   const showStats: RankedShowStat[] = Array.from(showMap.entries())
     .map(([title, eps]): RankedShowStat => {
       const distinct = new Set(eps.map((e) => e.title.trim()));
@@ -315,7 +324,7 @@ export function computeWrappedStats(entries: NetflixEntry[]): WrappedStats {
       const kind = only !== null && only === title && !EPISODE_MARKER.test(only) ? "movie" : "show";
       return {
         title,
-        watchCount: eps.length,
+        watchCount: hasTimeData ? new Set(eps.map(titleDayKey)).size : eps.length,
         totalSeconds: eps.reduce((s, e) => s + e.durationSeconds, 0),
         kind,
       };
@@ -389,10 +398,7 @@ export function computeWrappedStats(entries: NetflixEntry[]): WrappedStats {
   // so this dedupes those; date-only exports already have one row per title per day, so it
   // equals the entry count there.
   const titleDays = new Set<string>();
-  for (const e of watchEntries) {
-    const d = e.startTime;
-    titleDays.add(`${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}|${e.title.trim()}`);
-  }
+  for (const e of watchEntries) titleDays.add(titleDayKey(e));
   const distinctTitleDays = titleDays.size;
 
   return {

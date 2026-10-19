@@ -137,9 +137,10 @@ export function NetflixFileSteps() {
 
 /**
  * In-app browsers (Instagram, WhatsApp...) can't hand over the Netflix file: show the code big,
- * say where to open the link, and copy it in one tap.
+ * say where to open the link, and copy it in one tap. Shown to invitees, so the code is labelled
+ * as the friend's; pass `heading` if the viewer owns the code.
  */
-export function InAppInvite({ code }: { code: string }) {
+export function InAppInvite({ code, heading = "Your friend's code" }: { code: string; heading?: string }) {
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => {
@@ -170,7 +171,7 @@ export function InAppInvite({ code }: { code: string }) {
   return (
     <div className="flex flex-col items-center gap-3 text-center">
       <p className="text-sm font-semibold uppercase" style={{ letterSpacing: "0.1em", color: "var(--color-muted)" }}>
-        Your invite code
+        {heading}
       </p>
       <p className="font-mono font-semibold select-all text-headline tracking-[0.2em]" style={{ color: "var(--color-text)" }}>
         {shown}

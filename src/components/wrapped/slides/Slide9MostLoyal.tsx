@@ -76,6 +76,8 @@ export function Slide9MostLoyal({ stats }: Props) {
               <HeroGlow />
               {/* Wipes in from the right edge (clip-path) instead of the spring pop the other slides use */}
               <motion.div
+                role="heading"
+                aria-level={2}
                 className="relative slide-hero font-black text-gradient-red tabular-nums"
                 initial={
                   reduce

@@ -83,6 +83,8 @@ export function Slide3TopShow({ stats }: Props) {
             </motion.h2>
 
             <motion.div
+              role="heading"
+              aria-level={2}
               className="slide-hero font-black text-gradient-red tabular-nums"
               initial={{ opacity: 0, scale: 0.7 }}
               animate={{ opacity: 1, scale: 1 }}

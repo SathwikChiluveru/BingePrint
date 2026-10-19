@@ -36,7 +36,6 @@ interface AutoplayedStore {
   clearWrapped: () => void;
   setPendingInvite: (invite: PendingInvite | null) => void;
   setMyGroup: (group: MyGroup | null) => void;
-  clearMyGroupIfStale: (sessionId: string | null | undefined) => boolean;
 }
 
 export function isPendingInviteFresh(invite: PendingInvite | null, now = Date.now()): invite is PendingInvite {
@@ -47,7 +46,14 @@ export function isPendingInviteFresh(invite: PendingInvite | null, now = Date.no
   return now - invite.savedAt < PENDING_INVITE_TTL_MS;
 }
 
-/** True when myGroup was saved from a different reel than `sessionId`. Unknown origin is not stale. */
+/**
+ * True when myGroup was saved from a different reel than `sessionId`. Unknown origin is not stale.
+ *
+ * Stale does NOT mean gone: the user is still in that group, the group just sees an older reel.
+ * Keep the group (its invite code still works) and offer "Update my stats in {group}", linking to
+ * `/groups/{id}?update=1`, which refreshes their spot and re-stamps myGroup with the current reel.
+ * In components prefer the reactive `useMyGroupNeedsUpdate()`; outside React, `myGroupNeedsUpdate()`.
+ */
 export function isMyGroupStale(group: MyGroup | null, sessionId: string | null | undefined): boolean {
   return !!group && !!group.sessionId && !!sessionId && group.sessionId !== sessionId;
 }
@@ -70,7 +76,7 @@ if (typeof window !== "undefined") {
 
 export const useAutoplayedStore = create<AutoplayedStore>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       wrappedStats: null,
       sessionId: null,
       pendingInvite: null,
@@ -88,11 +94,6 @@ export const useAutoplayedStore = create<AutoplayedStore>()(
         set((s) => ({
           myGroup: myGroup ? { ...myGroup, sessionId: myGroup.sessionId ?? s.sessionId ?? undefined } : null,
         })),
-      clearMyGroupIfStale: (sessionId) => {
-        if (!isMyGroupStale(get().myGroup, sessionId)) return false;
-        set({ myGroup: null });
-        return true;
-      },
     }),
     {
       name: STORAGE_KEY,
@@ -101,12 +102,32 @@ export const useAutoplayedStore = create<AutoplayedStore>()(
 );
 
 /**
- * Forget the stored group when it was made from a different reel than `sessionId`, so a new
- * upload never ships an old group's code. Groups saved before sessionId was tracked are kept.
- * Returns true when it cleared one.
+ * True when the stored group sees a different reel than `sessionId` (defaults to the current
+ * reel), so the user should update their stats there. Reads the store once; not reactive.
+ */
+export function myGroupNeedsUpdate(sessionId?: string | null): boolean {
+  const { myGroup, sessionId: current } = useAutoplayedStore.getState();
+  return isMyGroupStale(myGroup, sessionId === undefined ? current : sessionId);
+}
+
+/** Reactive myGroupNeedsUpdate() for components. */
+export function useMyGroupNeedsUpdate(sessionId?: string | null): boolean {
+  return useAutoplayedStore((s) => isMyGroupStale(s.myGroup, sessionId === undefined ? s.sessionId : sessionId));
+}
+
+/** `/groups/{id}?update=1`: opens the group and refreshes this member's stats from the current reel. */
+export function updateMyStatsHref(groupId: string): string {
+  return `/groups/${encodeURIComponent(groupId)}?update=1`;
+}
+
+/**
+ * @deprecated A new reel no longer clears the stored group: the user is still in it, and dropping
+ * it made people start duplicate groups. Kept as a no-op (always false) so existing callers
+ * compile; use myGroupNeedsUpdate() and link "Update my stats in {group}" to updateMyStatsHref().
  */
 export function clearMyGroupIfStale(sessionId: string | null | undefined): boolean {
-  return useAutoplayedStore.getState().clearMyGroupIfStale(sessionId);
+  void sessionId;
+  return false;
 }
 
 /**

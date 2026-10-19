@@ -39,7 +39,7 @@ export function Slide1Intro({}: Props) {
         >
           Your all-time
           <br />
-          <span style={{ color: "var(--color-red)" }}>Autoplayed</span>
+          <span style={{ color: "var(--color-red)" }}>reel</span>
         </motion.h1>
       </div>
 

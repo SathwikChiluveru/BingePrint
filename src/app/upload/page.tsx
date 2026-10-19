@@ -48,7 +48,7 @@ function Spinner() {
 function FilePath({ children }: { children: React.ReactNode }) {
   return (
     <code
-      className="px-1.5 py-0.5 text-[0.8125rem] break-all"
+      className="px-1.5 py-0.5 text-xs break-all"
       style={{ background: "var(--color-surface-3)", color: "var(--color-text)", borderRadius: "var(--radius-sm)" }}
     >
       {children}
@@ -57,7 +57,7 @@ function FilePath({ children }: { children: React.ReactNode }) {
 }
 
 export default function UploadPage() {
-  const { state, error, dragging, onFileInput, dropHandlers } = useReelUpload();
+  const { state, error, notice, dragging, onFileInput, dropHandlers } = useReelUpload();
   const storedInvite = useAutoplayedStore((s) => s.pendingInvite);
   const setPendingInvite = useAutoplayedStore((s) => s.setPendingInvite);
   // The invite lives in localStorage, so only show it after hydration to keep server and client markup equal
@@ -130,11 +130,20 @@ export default function UploadPage() {
                   <UploadIcon />
                 </span>
                 <span className="block">
+                  {/* Touch screens can't drop a file: CSS picks the wording by input type, so markup matches SSR */}
                   <span className="block font-semibold text-lg">
-                    {dragging ? "Drop to build your reel" : "Drop your CSV here"}
+                    {dragging ? (
+                      "Drop to build your reel"
+                    ) : (
+                      <>
+                        <span className="pointer-coarse:hidden">Drop your CSV here</span>
+                        <span className="hidden pointer-coarse:inline">Pick your CSV</span>
+                      </>
+                    )}
                   </span>
                   <span className="block text-sm mt-1" style={{ color: "var(--color-text-secondary)" }}>
-                    or <span className="underline group-hover:text-white">choose a file</span> · .csv up to 50MB
+                    <span className="pointer-coarse:hidden">or </span>
+                    <span className="underline group-hover:text-white">choose a file</span> · .csv up to 50MB
                   </span>
                 </span>
                 <input
@@ -166,6 +175,12 @@ export default function UploadPage() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {notice && (
+            <p role="status" className="mt-3 text-sm text-center break-words" style={{ color: "var(--color-text-secondary)" }}>
+              {notice}
+            </p>
+          )}
 
           {state === "error" && error && (
             <motion.div
@@ -253,6 +268,10 @@ export default function UploadPage() {
               </ol>
             </div>
           </section>
+
+          <p className="mt-8 text-center text-xs" style={{ color: "var(--color-muted)" }}>
+            Autoplayed is not affiliated with Netflix, Inc.
+          </p>
         </motion.div>
       </main>
     </MotionConfig>

@@ -87,6 +87,11 @@ function readStoredSlide(sessionId: string, totalSlides: number): number {
   }
 }
 
+/** Start this reel from slide 1 next time it mounts ("Watch my reel" from the card view). */
+export function resetStoredSlide(sessionId: string) {
+  writeStoredSlide(sessionId, 0);
+}
+
 function writeStoredSlide(sessionId: string, index: number) {
   try {
     window.sessionStorage.setItem(SLIDE_KEY_PREFIX + sessionId, String(index));
@@ -151,7 +156,11 @@ export function SlideShow({ stats, sessionId }: Props) {
     Boolean(stats.mostLoyalShow?.title) &&
     stats.mostLoyalShow?.title !== stats.topShows?.[0]?.title;
 
-  const slides = [
+  // An empty history has nothing to show on slides 2 to 9: the intro goes straight to the card's
+  // empty state (same test as Slide10Share).
+  const emptyReel = !(Number(stats.totalEpisodesEstimate) > 0) && !(Number(stats.totalHours) > 0);
+
+  const allSlides = [
     <Slide1Intro key="1" stats={stats} />,
     <Slide2TotalHours key="2" stats={stats} />,
     <Slide3TopShow key="3" stats={stats} />,
@@ -165,6 +174,7 @@ export function SlideShow({ stats, sessionId }: Props) {
     <Slide8Personality key="8" stats={stats} />,
     <Slide10Share key="10" stats={stats} sessionId={sessionId} />,
   ].filter((s): s is React.JSX.Element => s !== null);
+  const slides = emptyReel ? [allSlides[0], allSlides[allSlides.length - 1]] : allSlides;
   const totalSlides = slides.length;
 
   // Only rendered on the client (the page waits for hydration), so storage is readable here.

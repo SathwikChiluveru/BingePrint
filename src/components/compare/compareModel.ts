@@ -90,7 +90,7 @@ function formatHoursOneDp(h: number) {
 }
 
 const PERSONALITY_JAB: Record<Personality, string> = {
-  "The Binge Lord": "Crowned The Binge Lord. Not a compliment.",
+  "The Binge Lord": "Crowned the Binge Lord. Not a compliment.",
   "The Night Owl": "The Night Owl. Sleep is a rumor.",
   "The Weekend Warrior": "The Weekend Warrior. Saturdays never stood a chance.",
   "The Loyalist": "The Loyalist. Same show, forever.",

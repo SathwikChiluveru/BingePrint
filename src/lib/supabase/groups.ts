@@ -55,3 +55,48 @@ export function isOwnerTeaser(value: unknown): value is OwnerTeaser {
     typeof v.statValue === "string"
   );
 }
+
+/** One row of GET /api/groups: a group the signed-in user owns or is a member of. */
+export interface MyGroupSummary {
+  id: string;
+  name: string;
+  invite_code: string;
+  memberCount: number;
+  /** This user created the group */
+  ownedByMe: boolean;
+  /** This user has a spot on the board (an owner can create a group without adding their reel) */
+  isMember: boolean;
+}
+
+export type MyGroupsResult =
+  | { ok: true; groups: MyGroupSummary[] }
+  | { ok: false; reason: "signed-out" | "rate-limited" | "failed" };
+
+export const MY_GROUPS_TIMEOUT_MS = 10_000;
+
+/**
+ * The signed-in user's groups, newest first (client side). Never throws: signed out is
+ * `{ ok: false, reason: "signed-out" }`, and timeouts or network errors are "failed".
+ */
+export async function fetchMyGroups(
+  { signal, timeoutMs = MY_GROUPS_TIMEOUT_MS }: { signal?: AbortSignal; timeoutMs?: number } = {}
+): Promise<MyGroupsResult> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const onAbort = () => controller.abort();
+  signal?.addEventListener("abort", onAbort, { once: true });
+  try {
+    const res = await fetch("/api/groups", { cache: "no-store", signal: controller.signal });
+    if (res.status === 401) return { ok: false, reason: "signed-out" };
+    if (res.status === 429) return { ok: false, reason: "rate-limited" };
+    if (!res.ok) return { ok: false, reason: "failed" };
+    const data = (await res.json().catch(() => null)) as { groups?: unknown } | null;
+    if (!data || !Array.isArray(data.groups)) return { ok: false, reason: "failed" };
+    return { ok: true, groups: data.groups as MyGroupSummary[] };
+  } catch {
+    return { ok: false, reason: "failed" };
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener("abort", onAbort);
+  }
+}

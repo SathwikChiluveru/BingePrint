@@ -9,9 +9,12 @@ import { isPendingInviteFresh, useAutoplayedStore } from "@/lib/store";
 import { ArrowLeftIcon, ArrowRightIcon } from "@/components/groups/icons";
 import { suggestGroupName, suggestNickname } from "@/components/groups/memberStats";
 import InviteFrame, { InAppInvite, NetflixFileSteps, useInAppBrowser } from "@/components/groups/InviteFrame";
+import MyGroupsList from "@/components/groups/MyGroupsList";
 import { toGroupSummary } from "@/lib/share/safety";
 import {
   INVITE_ACTIONS,
+  INVITE_CODE_FORMAT_ERROR,
+  JOIN_ACTIONS,
   TEASER_CHECKBOX_LABEL,
   createGroupErrorMessage,
   teaserFormDisclosure,
@@ -156,7 +159,7 @@ function GroupsContent() {
     if (!isValidInviteCode(code)) {
       setLoading(false);
       setMode("join");
-      setError("Invite codes are 8 to 10 letters and numbers. Check the code with whoever sent it.");
+      setError(INVITE_CODE_FORMAT_ERROR);
       return;
     }
     const outcome = await findGroup(code);
@@ -324,7 +327,7 @@ function GroupsContent() {
           ) : (
             <>
               <Link href={code ? uploadWithInviteHref(code) : "/upload"} className="btn-primary py-3 text-lg">
-                Prove it
+                {JOIN_ACTIONS.makeReel}
                 <ArrowRightIcon />
               </Link>
               <p className="text-sm" style={{ color: "var(--color-muted)" }}>
@@ -373,6 +376,7 @@ function GroupsContent() {
               </p>
             </div>
           </div>
+          <MyGroupsList />
         </motion.div>
       )}
 
@@ -458,7 +462,6 @@ function GroupsContent() {
               type="text"
               required
               maxLength={INVITE_CODE_MAX_LENGTH + 2}
-              pattern="\s*[A-Za-z0-9\-\s]{8,12}\s*"
               autoComplete="off"
               autoCapitalize="characters"
               spellCheck={false}

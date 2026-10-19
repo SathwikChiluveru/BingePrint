@@ -18,6 +18,39 @@ export const INVITE_ACTIONS = {
 
 export type InviteActionName = (typeof INVITE_ACTIONS)[keyof typeof INVITE_ACTIONS];
 
+/**
+ * What an invitee's button does, named by outcome. One name per outcome, never "Prove it" (that
+ * stays a headline line): no reel yet, reel but signed out, signed in with a reel.
+ */
+export const JOIN_ACTIONS = {
+  makeReel: "Make my reel",
+  signInToAdd: "Sign in to add my reel",
+  addReel: "Add my reel",
+} as const;
+
+/** Group names run to 60 characters; past this, buttons say "your group" instead. */
+export const GROUP_NAME_BUTTON_MAX = 24;
+
+/** The group's name when it fits in a button label, otherwise `fallback` ("your group"). */
+export function groupNameForButton(name: string | null | undefined, fallback = "your group"): string {
+  const trimmed = (name ?? "").trim();
+  return trimmed && trimmed.length <= GROUP_NAME_BUTTON_MAX ? trimmed : fallback;
+}
+
+/** "Update my stats in {group}", shortened for long names. Shared by the group page and the reel. */
+export function updateStatsLabel(groupName: string | null | undefined): string {
+  return `Update my stats in ${groupNameForButton(groupName)}`;
+}
+
+/** "Add my reel to {group}", shortened for long names. */
+export function addReelToLabel(groupName: string | null | undefined): string {
+  return `Add my reel to ${groupNameForButton(groupName)}`;
+}
+
+/** Error for a typed code that fails isValidInviteCode (8 to 10 letters and numbers). */
+export const INVITE_CODE_FORMAT_ERROR =
+  "Invite codes are 8 to 10 characters, letters and numbers only. Check the code with whoever sent it.";
+
 /** One-tap create on the reel's last slide (teaser is on by default there). */
 export const TEASER_DISCLOSURE =
   "Starts a group with your stats, never your file. Friends with the code see your personality.";

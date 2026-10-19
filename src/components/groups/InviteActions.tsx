@@ -11,7 +11,7 @@ import {
   inviteShareTitle,
   inviteUrl,
 } from "@/lib/copy/invite";
-import { CheckIcon, CopyIcon, ShareIcon } from "./icons";
+import { CheckIcon, CopyIcon, UserPlusIcon } from "./icons";
 
 // Kept for older imports; the copy module owns invite links now
 export { inviteUrl };
@@ -151,7 +151,7 @@ export default function InviteActions({ code, groupName, sharePrimary = false, o
           onClick={share}
           className={`${sharePrimary ? "btn-primary" : "btn-secondary"} flex-1 px-6 py-3`}
         >
-          <ShareIcon />
+          <UserPlusIcon />
           {INVITE_ACTIONS.shareInvite}
         </button>
         <button type="button" onClick={copyCode} className="btn-secondary flex-1 px-6 py-3">

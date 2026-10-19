@@ -131,6 +131,8 @@ export function Slide7DayHeatmap({ stats }: Props) {
           </motion.p>
 
           <motion.div
+            role="heading"
+            aria-level={2}
             className="slide-hero font-black text-gradient-red tabular-nums"
             style={heroStyle}
             // Rises out of its own baseline like the bars below it grow, instead of the spring pop
@@ -168,15 +170,14 @@ export function Slide7DayHeatmap({ stats }: Props) {
               animate={{ opacity: 1 }}
               transition={{ delay: 0.5, duration: 0.4, ease: EASE_SMOOTH }}
             >
-              {/* One short line: the "~" and "estimated" carry the hedge */}
+              {/* One short line: the "~" alone carries the hedge, never a second "estimated" */}
               {countMode ? (
                 <>
-                  <HoursText hours={peakHours} estimated /> all-time, estimated
+                  <HoursText hours={peakHours} estimated /> all-time
                 </>
               ) : weeklyAverage !== null ? (
                 <>
                   <HoursText hours={weeklyAverage} estimated={estimated} /> on an average {peakName}
-                  {estimated && ", estimated"}
                 </>
               ) : (
                 "Hours estimated from title counts"

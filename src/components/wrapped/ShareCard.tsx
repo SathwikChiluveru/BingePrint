@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { useSyncExternalStore } from "react";
 import {
   PLAY_MARK_ASPECT,
@@ -18,7 +18,10 @@ import { safeInviteCode } from "@/lib/share/safety";
 export type ShareCardStats = ShareImageStats;
 
 const SMOOTH = [0.4, 0, 0.2, 1] as const;
-const SPRING = [0.34, 1.56, 0.64, 1] as const;
+// Same confident landing as slide 8's stamp: no overshoot.
+const EASE_OUT_EXPO = [0.16, 1, 0.3, 1] as const;
+// The personality word lands first; the rest of the card settles in around it.
+const T_REST = 0.35;
 
 const noopSubscribe = () => () => {};
 
@@ -68,6 +71,8 @@ interface ShareCardProps {
  */
 export function ShareCard({ stats, inviteCode, ownedByMe }: ShareCardProps) {
   const host = useHost();
+  // Scale and blur are motion; reduced motion gets an opacity-only arrival.
+  const reduce = useReducedMotion();
   const personality = stats.personality?.trim() || "The Casual Viewer";
   const roast = shareRoastLine(stats);
   const topShowLine = pickTopShowLine(stats);
@@ -83,9 +88,9 @@ export function ShareCard({ stats, inviteCode, ownedByMe }: ShareCardProps) {
     <motion.section
       aria-label="Your Autoplayed card"
       className="card relative w-full max-w-sm overflow-hidden rounded-[20px] px-6 pt-5 pb-4 text-center short:px-5 short:pt-4 short:pb-3"
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: SMOOTH }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3, ease: SMOOTH }}
     >
       {/* One glow source, centered behind the personality hero */}
       <div
@@ -106,87 +111,100 @@ export function ShareCard({ stats, inviteCode, ownedByMe }: ShareCardProps) {
         {/*
           Solid white so the primary CTA below stays the one red thing on the slide. The exported
           PNG fills this hero with the red gradient instead: it carries no CTA (see DESIGN.md).
+          The payoff of slide 8: the verdict word is carried over, arriving oversized and soft, and
+          settles into the card before anything else on it. It is the slide's heading.
         */}
-        <motion.p
+        <motion.h2
           className="mt-4 font-black break-words text-display md:text-headline short:mt-2 short:text-headline"
           style={{ color: "var(--color-text)", textWrap: "balance" }}
-          initial={{ opacity: 0, scale: 0.85 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, delay: 0.1, ease: SPRING }}
+          initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 1.3, filter: "blur(8px)" }}
+          animate={reduce ? { opacity: 1 } : { opacity: 1, scale: 1, filter: "blur(0px)" }}
+          transition={
+            reduce
+              ? { duration: 0.4, ease: SMOOTH }
+              : { duration: 0.6, ease: EASE_OUT_EXPO, opacity: { duration: 0.2 } }
+          }
         >
           {personality}
-        </motion.p>
+        </motion.h2>
 
-        {roast && (
-          <p
-            className="mt-3 text-sm leading-snug line-clamp-3 short:mt-2 short:line-clamp-2"
-            style={{ color: "var(--color-text-secondary)", textWrap: "pretty" }}
-          >
-            {roast}
-          </p>
-        )}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.35, delay: reduce ? 0.15 : T_REST, ease: SMOOTH }}
+        >
 
-        <div
-          aria-hidden="true"
-          className="mx-auto mt-4 h-px w-2/5 short:mt-3"
-          style={{ background: "var(--color-border-strong)" }}
-        />
-
-        {topShowLine && (
-          <p
-            className="mt-4 text-base font-semibold leading-snug break-words [overflow-wrap:anywhere] line-clamp-2 short:mt-3 short:line-clamp-1"
-            style={{ color: "var(--color-text)", textWrap: "balance" }}
-          >
-            {topShowLine}
-          </p>
-        )}
-
-        <p className="mt-2 flex items-baseline justify-center gap-2">
-          {totalSpoken && <span className="sr-only">{totalSpoken}</span>}
-          <span
-            className="font-black tabular-nums text-headline"
-            style={{ color: "var(--color-text)" }}
-            aria-hidden={totalSpoken ? true : undefined}
-          >
-            {total.value}
-          </span>
-          <span
-            aria-hidden={totalSpoken ? true : undefined}
-            className="uppercase font-semibold text-xs"
-            style={{ color: "var(--color-muted)", letterSpacing: "0.1em" }}
-          >
-            {total.label}
-          </span>
-        </p>
-
-        {code && (
-          <div
-            className="mt-4 rounded-2xl px-4 py-3 short:mt-3 short:py-2"
-            style={{ background: "var(--color-surface-2)", border: "1px solid var(--color-border-strong)" }}
-          >
+          {roast && (
             <p
+              className="mt-3 text-sm leading-snug line-clamp-3 short:mt-2 short:line-clamp-1"
+              style={{ color: "var(--color-text-secondary)", textWrap: "pretty" }}
+            >
+              {roast}
+            </p>
+          )}
+
+          <div
+            aria-hidden="true"
+            className="mx-auto mt-4 h-px w-2/5 short:mt-3"
+            style={{ background: "var(--color-border-strong)" }}
+          />
+
+          {topShowLine && (
+            <p
+              className="mt-4 text-base font-semibold leading-snug break-words [overflow-wrap:anywhere] line-clamp-2 short:mt-3 short:line-clamp-1"
+              style={{ color: "var(--color-text)", textWrap: "balance" }}
+            >
+              {topShowLine}
+            </p>
+          )}
+
+          <p className="mt-2 flex items-baseline justify-center gap-2">
+            {totalSpoken && <span className="sr-only">{totalSpoken}</span>}
+            <span
+              className="font-black tabular-nums text-headline"
+              style={{ color: "var(--color-text)" }}
+              aria-hidden={totalSpoken ? true : undefined}
+            >
+              {total.value}
+            </span>
+            <span
+              aria-hidden={totalSpoken ? true : undefined}
               className="uppercase font-semibold text-xs"
               style={{ color: "var(--color-muted)", letterSpacing: "0.1em" }}
             >
-              {inviteLabel(ownedByMe)}
-            </p>
-            <p
-              className="mt-1 font-mono font-bold text-title tracking-[0.18em]"
-              style={{ color: "var(--color-text)" }}
-            >
-              {code}
-            </p>
-            {host && (
-              <p className="mt-1 text-xs truncate" style={{ color: "var(--color-text-secondary)" }}>
-                {host}/groups?join={code}
-              </p>
-            )}
-          </div>
-        )}
+              {total.label}
+            </span>
+          </p>
 
-        <p className="mt-4 text-xs short:mt-2" style={{ color: "var(--color-muted)" }}>
-          {host && !code ? `${host} · ` : ""}Not affiliated with Netflix.
-        </p>
+          {code && (
+            <div
+              className="mt-4 rounded-2xl px-4 py-3 short:mt-3 short:py-2"
+              style={{ background: "var(--color-surface-2)", border: "1px solid var(--color-border-strong)" }}
+            >
+              <p
+                className="uppercase font-semibold text-xs"
+                style={{ color: "var(--color-muted)", letterSpacing: "0.1em" }}
+              >
+                {inviteLabel(ownedByMe)}
+              </p>
+              <p
+                className="mt-1 font-mono font-bold text-title tracking-[0.18em]"
+                style={{ color: "var(--color-text)" }}
+              >
+                {code}
+              </p>
+              {host && (
+                <p className="mt-1 text-xs truncate" style={{ color: "var(--color-text-secondary)" }}>
+                  {host}/groups?join={code}
+                </p>
+              )}
+            </div>
+          )}
+
+          <p className="mt-4 text-xs short:mt-2" style={{ color: "var(--color-muted)" }}>
+            {host && !code ? `${host} · ` : ""}Not affiliated with Netflix.
+          </p>
+        </motion.div>
       </div>
     </motion.section>
   );

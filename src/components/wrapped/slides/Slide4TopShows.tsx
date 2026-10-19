@@ -6,7 +6,7 @@ import { isLikelyMovie } from "@/lib/csv/stats";
 import { HeroGlow } from "./HeroGlow";
 
 interface Props {
-  stats: Pick<WrappedStats, "topShows" | "hasTimeData" | "uniqueShowsCount" | "totalEpisodesEstimate">;
+  stats: Pick<WrappedStats, "topShows" | "hasTimeData" | "uniqueShowsCount" | "totalEpisodesEstimate" | "distinctTitleDays">;
 }
 
 const SMOOTH: [number, number, number, number] = [0.4, 0, 0.2, 1];
@@ -43,13 +43,14 @@ function topShowsShare(shows: ShowStat[], totalTitles: number): number {
 
 /**
  * Sets the top list against how many titles got a try. uniqueShowsCount counts movies as well as
- * shows, so the copy says "titles". The share itself is the hero, so it is not repeated.
+ * shows, so the copy says "titles". The share itself is the hero, so it is not repeated, and the
+ * list is named once ("your top 5" under the hero), never echoed here.
  */
 function topShowsQuip(n: number, uniqueTitles: number): string {
   if (uniqueTitles <= n) {
     return `Only ${uniqueTitles.toLocaleString()} ${uniqueTitles === 1 ? "title" : "titles"} entered. Not much of a contest.`;
   }
-  return `${uniqueTitles.toLocaleString()} titles tried. ${n === 1 ? "This is the one" : `These ${n} are the ones`} you couldn't quit.`;
+  return `${uniqueTitles.toLocaleString()} titles tried. The rest never stood a chance.`;
 }
 
 export function Slide4TopShows({ stats }: Props) {
@@ -60,7 +61,10 @@ export function Slide4TopShows({ stats }: Props) {
   // estimates), watch time otherwise. Max over the list, not just #1, in case old stats rank differently.
   const barValue = (s: ShowStat) => (estimated ? s.watchCount : s.totalSeconds) || 0;
   const max = Math.max(...shows.map(barValue), 1);
-  const share = topShowsShare(shows, stats.totalEpisodesEstimate ?? 0);
+  // Timed exports count each title once per day (resumed sittings fold together), so the share is
+  // taken of the same unit: distinct title-days. Date-only rows already are one per title per day.
+  const titleUnits = estimated ? stats.totalEpisodesEstimate : (stats.distinctTitleDays ?? stats.totalEpisodesEstimate);
+  const share = topShowsShare(shows, titleUnits ?? 0);
   // MotionConfig reducedMotion="user" only drops transforms; render bars at their final
   // width outright so nothing grows under reduced motion.
   const reduce = useReducedMotion();
@@ -76,7 +80,7 @@ export function Slide4TopShows({ stats }: Props) {
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.1, duration: 0.3, ease: SMOOTH }}
         >
-          {shows.length > 1 ? `Hall of Fame: your top ${shows.length}` : "Hall of Fame"}
+          Hall of Fame
         </motion.p>
 
         {!first ? (
@@ -101,6 +105,8 @@ export function Slide4TopShows({ stats }: Props) {
                 <div className="relative">
                   <HeroGlow />
                   <motion.div
+                    role="heading"
+                    aria-level={2}
                     className="relative slide-hero font-black text-gradient-red tabular-nums origin-left"
                     initial={{ opacity: 0, scale: 0.7 }}
                     animate={{ opacity: 1, scale: 1 }}
@@ -117,7 +123,7 @@ export function Slide4TopShows({ stats }: Props) {
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.4, duration: 0.3, ease: SMOOTH }}
                 >
-                  of everything you watched went to {shows.length === 1 ? "this one" : `these ${shows.length}`}
+                  of everything you watched went to {shows.length === 1 ? "this one" : `your top ${shows.length}`}
                 </motion.p>
               </>
             )}

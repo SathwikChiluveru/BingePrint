@@ -71,6 +71,8 @@ export function Slide2TotalHours({ stats }: Props) {
         </motion.p>
 
         <motion.div
+          role="heading"
+          aria-level={2}
           className="slide-hero font-black mb-2 text-gradient-red tabular-nums"
           initial={{ opacity: 0, scale: 0.7 }}
           animate={{ opacity: 1, scale: 1 }}

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { rateLimit } from "@/lib/rate-limit";
+import type { MyGroupSummary } from "@/lib/supabase/groups";
 import { WrappedDataSchema, buildOwnerTeaser, clientIp, readJson } from "./_lib/wrapped";
 
 const CreateGroupSchema = z.object({
@@ -13,6 +14,53 @@ const CreateGroupSchema = z.object({
   // Opt-in: show the owner's personality + one stat on the invite page. Needs wrapped_data.
   share_teaser: z.boolean().optional(),
 });
+
+const noStore = { "Cache-Control": "no-store" };
+
+// Friend groups are small; this caps the response for anyone who has made a lot of them
+const MY_GROUPS_LIMIT = 50;
+
+/**
+ * GET /api/groups → { groups: MyGroupSummary[] } for the signed-in user, newest first.
+ * RLS does the scoping: "member read groups" returns only groups this user owns or is in, and
+ * "group read members" returns every member row of those groups (so the count is the real one).
+ * Only user_id is read from members; no wrapped_data leaves this route. 401 when signed out.
+ */
+export async function GET() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: noStore });
+  }
+
+  if (!rateLimit(`my-groups:${user.id}`, 60, 60_000).success) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: noStore });
+  }
+
+  const { data, error } = await supabase
+    .from("groups")
+    .select("id, name, invite_code, owner_id, created_at, members(user_id)")
+    .order("created_at", { ascending: false })
+    .limit(MY_GROUPS_LIMIT);
+
+  if (error || !data) {
+    return NextResponse.json({ error: "Couldn't load your groups" }, { status: 500, headers: noStore });
+  }
+
+  const groups: MyGroupSummary[] = data.map((g) => {
+    const members = Array.isArray(g.members) ? (g.members as { user_id: string | null }[]) : [];
+    return {
+      id: g.id,
+      name: g.name,
+      invite_code: g.invite_code,
+      memberCount: members.length,
+      ownedByMe: g.owner_id === user.id,
+      isMember: members.some((m) => m.user_id === user.id),
+    };
+  });
+
+  return NextResponse.json({ groups }, { headers: noStore });
+}
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import Link from "next/link";
@@ -12,7 +12,7 @@ import { ArrowLeftIcon, ArrowRightIcon, CheckIcon } from "@/components/groups/ic
 import { statsFingerprint, suggestNickname } from "@/components/groups/memberStats";
 import { StandingsList } from "@/components/compare/StandingRow";
 import { rankMembers } from "@/components/compare/compareModel";
-import type { Group, GroupMember } from "@/types";
+import type { Group, GroupMember, WrappedStats } from "@/types";
 import {
   displayInviteCode,
   isValidInviteCode,
@@ -21,7 +21,13 @@ import {
   type OwnerTeaser,
 } from "@/lib/supabase/groups";
 import { toGroupSummary } from "@/lib/share/safety";
-import { uploadWithInviteHref } from "@/lib/copy/invite";
+import {
+  JOIN_ACTIONS,
+  addReelToLabel,
+  groupNameForButton,
+  updateStatsLabel,
+  uploadWithInviteHref,
+} from "@/lib/copy/invite";
 
 // Members get the full group; a non-member who came through an invite gets a preview (no members)
 type LoadedGroup =
@@ -93,6 +99,11 @@ function GroupDetail() {
   const codeParam = isValidInviteCode(rawCode) ? rawCode : null;
   // ?add=1 from compare: the owner who isn't on the board wants the join form open
   const addParam = searchParams.get("add") === "1";
+  // ?update=1 from the reel ("Update my stats in {group}"): a member's spot is refreshed on arrival.
+  // Read once: the param is dropped from the URL as soon as the update starts.
+  const [updateRequested] = useState(() => searchParams.get("update") === "1");
+  // Sign-in from here comes straight back with the same intent (?code, ?add, ?update)
+  const currentSearch = searchParams.toString();
 
   const [group, setGroup] = useState<LoadedGroup | null>(null);
   const [needsSignIn, setNeedsSignIn] = useState(false);
@@ -109,8 +120,10 @@ function GroupDetail() {
   const [error, setError] = useState("");
   const [updating, setUpdating] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<{ ok: boolean; text: string } | null>(null);
+  const autoUpdateStarted = useRef(false);
 
   const wrappedStats = useAutoplayedStore((s) => s.wrappedStats);
+  const pendingInvite = useAutoplayedStore((s) => s.pendingInvite);
   const setPendingInvite = useAutoplayedStore((s) => s.setPendingInvite);
   const setMyGroup = useAutoplayedStore((s) => s.setMyGroup);
   const sessionId = useAutoplayedStore((s) => s.sessionId);
@@ -168,6 +181,7 @@ function GroupDetail() {
         ) {
           setShowJoinForm(true);
         }
+        runRequestedUpdate(data, authUser);
       })
       .catch(() => {
         // Offline, or the request ran past LOAD_TIMEOUT_MS
@@ -182,6 +196,9 @@ function GroupDetail() {
       clearTimeout(timer);
       controller.abort();
     };
+    // runRequestedUpdate is guarded by a ref and reads the store directly; reloading on its
+    // identity would refetch the group every render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId, codeParam, addParam, attempt]);
 
   const members: GroupMember[] = useMemo(() => group?.members ?? [], [group]);
@@ -250,8 +267,14 @@ function GroupDetail() {
     setJoinedAlone(true);
   }
 
-  async function handleUpdateStats() {
-    if (!wrappedStats || !group || updating) return;
+  function handleUpdateStats() {
+    if (!group || !wrappedStats || updating) return;
+    void updateStats(group, user, wrappedStats);
+  }
+
+  // Takes the group, user and stats as arguments so the ?update=1 flow can run it straight from
+  // the load callback, before those reach state
+  async function updateStats(group: LoadedGroup, user: AuthUser | null, wrappedStats: WrappedStats) {
     setUpdating(true);
     setUpdateStatus(null);
     let res: Response;
@@ -293,6 +316,26 @@ function GroupDetail() {
     setUpdateStatus({ ok: true, text: "Stats updated. The group sees your new reel." });
   }
 
+  // ?update=1: called once the member view has loaded. Refreshes this member's spot from the reel
+  // on this device, or (same numbers) just re-stamps myGroup; the "already matches" confirmation
+  // is derived in render. Runs once, then the param leaves the URL so a reload or a shared link
+  // never repeats it. Non-members, signed-out visitors and visitors without a reel get the normal page.
+  function runRequestedUpdate(loaded: LoadedGroup, authUser: AuthUser | null) {
+    const stats = useAutoplayedStore.getState().wrappedStats;
+    if (!updateRequested || autoUpdateStarted.current || loaded.preview || !authUser || !stats) return;
+    const mine = (loaded.members ?? []).find((m) => m.user_id === authUser.id);
+    if (!mine) return;
+    autoUpdateStarted.current = true;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("update");
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    if (statsFingerprint(mine.wrapped_data) !== statsFingerprint(stats)) {
+      void updateStats(loaded, authUser, stats);
+      return;
+    }
+    setMyGroup({ id: loaded.id, inviteCode: loaded.invite_code, name: loaded.name, ownedByMe: authUser.id === loaded.owner_id });
+  }
+
   if (loading) {
     return (
       <CenteredMain>
@@ -313,7 +356,10 @@ function GroupDetail() {
           <p style={{ color: "var(--color-text-secondary)" }}>
             Groups are private to the people in them. Sign in here and you&apos;ll come straight back.
           </p>
-          <Link href={`/auth/login?next=${encodeURIComponent(`/groups/${groupId}`)}`} className="btn-primary py-3">
+          <Link
+            href={`/auth/login?next=${encodeURIComponent(`/groups/${groupId}${currentSearch ? `?${currentSearch}` : ""}`)}`}
+            className="btn-primary py-3"
+          >
             Sign in
             <ArrowRightIcon />
           </Link>
@@ -371,6 +417,8 @@ function GroupDetail() {
   // The local reel differs from what the group sees: offer to update it in place
   const statsOutdated =
     !!myMember && !!wrappedStats && statsFingerprint(myMember.wrapped_data) !== statsFingerprint(wrappedStats);
+  // Arrived via ?update=1 as a member with a reel: the update's progress and result lead the page
+  const autoUpdate = updateRequested && isMember && !!wrappedStats;
   // One red action per screen: the join form when open; for an owner off the board, adding their
   // reel; else Compare once there's a pair; else sharing the invite
   const primary: "join" | "add" | "compare" | "share" =
@@ -386,11 +434,24 @@ function GroupDetail() {
     ? `/groups/${groupId}?code=${encodeURIComponent(group.invite_code)}`
     : `/groups/${groupId}`;
   const signInHref = `/auth/login?next=${encodeURIComponent(returnPath)}`;
+  // Signing in to add a reel: &add=1 opens the form as soon as they're back
+  const signInToAddHref = `/auth/login?next=${encodeURIComponent(
+    `${returnPath}${returnPath.includes("?") ? "&" : "?"}add=1`
+  )}`;
+  // Invitee who arrived with this group's code (URL or a fresh saved invite), signed in, reel on
+  // hand: skip the pitch and go straight to adding the reel
+  const invite = isPendingInviteFresh(pendingInvite) ? pendingInvite : null;
+  const inviteMatches =
+    !!codeParam || addParam || (!!invite && (invite.groupId === group.id || invite.code === group.invite_code));
+  const directAdd = isPreview && !!wrappedStats && !!user && inviteMatches;
+  const buttonGroupName = groupNameForButton(group.name);
   const shownCode = displayInviteCode(group.invite_code);
-  // There is no group list: members with a reel on this device go back to it, everyone else home
+  // Back to the reel on this device when there is one; signed in without one, to "Your groups"
+  // on /groups; everyone else home
   const reelHref = sessionId ? `/wrapped/${encodeURIComponent(sessionId)}` : null;
-  const backHref = reelHref && wrappedStats ? reelHref : "/";
-  const backLabel = reelHref && wrappedStats ? "My reel" : "Home";
+  const hasReel = !!reelHref && !!wrappedStats;
+  const backHref = hasReel && reelHref ? reelHref : user ? "/groups" : "/";
+  const backLabel = hasReel ? "My reel" : user ? "Your groups" : "Home";
   const rememberInvite = () =>
     setPendingInvite({ code: group.invite_code, groupName: group.name, groupId: group.id });
 
@@ -433,7 +494,8 @@ function GroupDetail() {
     </button>
   );
 
-  // Nickname form for a signed-in visitor with a reel (preview "Prove it", or an owner off the board)
+  // Nickname form for a signed-in visitor with a reel (an invitee, or an owner off the board).
+  // The direct-add view has no Cancel: the form is the whole page there.
   const joinForm = (
     <motion.form
       onSubmit={handleJoinGroup}
@@ -444,7 +506,7 @@ function GroupDetail() {
     >
       <label className="flex flex-col gap-2">
         <span className="text-sm font-medium" style={{ color: "var(--color-muted)" }}>
-          Your name in {group.name}
+          Your name in {groupNameForButton(group.name, "the group")}
         </span>
         <input
           type="text"
@@ -461,9 +523,9 @@ function GroupDetail() {
       {privacyLine}
       {errorBox}
       <button type="submit" disabled={joining || !nickname.trim()} className="btn-primary py-3">
-        {joining ? "Adding…" : "Add my reel"}
+        {joining ? "Adding…" : JOIN_ACTIONS.addReel}
       </button>
-      {cancelButton}
+      {!directAdd && cancelButton}
     </motion.form>
   );
 
@@ -486,11 +548,11 @@ function GroupDetail() {
       ) : (
         <>
           <Link href={uploadWithInviteHref(group.invite_code)} onClick={rememberInvite} className="btn-primary py-3 text-lg">
-            Prove it
+            {JOIN_ACTIONS.makeReel}
             <ArrowRightIcon />
           </Link>
           <p className="text-sm" style={{ color: "var(--color-muted)" }}>
-            Make your reel, then it brings you back here.
+            Your reel ends with a link back here.
           </p>
           <div className="mt-4">
             <NetflixFileSteps />
@@ -500,8 +562,8 @@ function GroupDetail() {
     } else if (!user) {
       action = (
         <>
-          <Link href={signInHref} onClick={rememberInvite} className="btn-primary py-3 text-lg">
-            Prove it
+          <Link href={signInToAddHref} onClick={rememberInvite} className="btn-primary py-3 text-lg">
+            {JOIN_ACTIONS.signInToAdd}
             <ArrowRightIcon />
           </Link>
           <p className="text-sm" style={{ color: "var(--color-muted)" }}>
@@ -515,7 +577,7 @@ function GroupDetail() {
       action = (
         <>
           <button type="button" onClick={() => setShowJoinForm(true)} className="btn-primary py-3 text-lg">
-            Prove it
+            {JOIN_ACTIONS.addReel}
             <ArrowRightIcon />
           </button>
           {privacyLine}
@@ -523,18 +585,56 @@ function GroupDetail() {
       );
     }
 
+    const backLink = (
+      <div className="w-full max-w-xl mx-auto">
+        <Link
+          href={backHref}
+          className="-ml-1 inline-flex items-center gap-2 min-h-[44px] pr-3 text-sm transition-colors hover:text-[var(--color-text)]"
+          style={{ color: "var(--color-text-secondary)" }}
+        >
+          <ArrowLeftIcon size={16} />
+          {backLabel}
+        </Link>
+      </div>
+    );
+
+    // Already pitched, already has a reel, already signed in: no second pitch, just the form
+    if (directAdd) {
+      return (
+        <main className="min-h-screen flex flex-col px-6 pt-3 pb-12" style={{ background: "var(--color-bg)" }}>
+          {backLink}
+          <div className="w-full max-w-md mx-auto flex-1 flex flex-col justify-center py-10 gap-6">
+            <div>
+              <h1
+                className="text-headline font-bold [overflow-wrap:anywhere]"
+                style={{ color: "var(--color-text)", textWrap: "balance" }}
+              >
+                {addReelToLabel(group.name)}
+              </h1>
+              <p className="mt-2" style={{ color: "var(--color-text-secondary)" }}>
+                {buttonGroupName === group.name.trim() ? (
+                  "Your stats go on the board next to everyone else's."
+                ) : (
+                  <>
+                    Your stats go on the board in{" "}
+                    <span className="font-semibold [overflow-wrap:anywhere]" style={{ color: "var(--color-text)" }}>
+                      {group.name}
+                    </span>
+                    .
+                  </>
+                )}
+                {teaser && <> Your friend is {teaser.personality.replace(/^The\s+/, "the ")}. Think you watch less?</>}
+              </p>
+            </div>
+            {joinForm}
+          </div>
+        </main>
+      );
+    }
+
     return (
       <main className="min-h-screen flex flex-col px-6 pt-3 pb-12" style={{ background: "var(--color-bg)" }}>
-        <div className="w-full max-w-xl mx-auto">
-          <Link
-            href={backHref}
-            className="-ml-1 inline-flex items-center gap-2 min-h-[44px] pr-3 text-sm transition-colors hover:text-[var(--color-text)]"
-            style={{ color: "var(--color-text-secondary)" }}
-          >
-            <ArrowLeftIcon size={16} />
-            {backLabel}
-          </Link>
-        </div>
+        {backLink}
         <div className="w-full max-w-xl mx-auto flex-1 flex flex-col justify-center py-10">
           <InviteFrame groupName={group.name} teaser={teaser}>
             {action}
@@ -586,15 +686,15 @@ function GroupDetail() {
         Your reel ends with a link back to {group.name}.
       </p>
       <Link href={uploadWithInviteHref(group.invite_code)} onClick={rememberInvite} className="btn-primary py-3">
-        Upload my Netflix history
+        {JOIN_ACTIONS.makeReel}
         <ArrowRightIcon />
       </Link>
       {cancelButton}
     </div>
   ) : !user ? (
     <div className="flex flex-col gap-4">
-      <Link href={signInHref} onClick={rememberInvite} className="btn-primary py-3">
-        Add my reel
+      <Link href={signInToAddHref} onClick={rememberInvite} className="btn-primary py-3">
+        {JOIN_ACTIONS.signInToAdd}
         <ArrowRightIcon />
       </Link>
       {privacyLine}
@@ -617,10 +717,41 @@ function GroupDetail() {
             <ArrowLeftIcon size={16} />
             {backLabel}
           </Link>
-          <h1 className="text-headline font-black break-words" style={{ color: "var(--color-text)" }}>
+          <h1 className="text-headline font-black break-words [overflow-wrap:anywhere]" style={{ color: "var(--color-text)" }}>
             {group.name}
           </h1>
         </div>
+
+        {/* Arrived from the reel's "Update my stats": progress, then the result, at the top */}
+        {autoUpdate && (
+          <div className="mb-6">
+            {updating || (!updateStatus && statsOutdated) ? (
+              <p role="status" style={{ color: "var(--color-text-secondary)" }}>
+                Updating your stats in {buttonGroupName}…
+              </p>
+            ) : !updateStatus || updateStatus.ok ? (
+              <div role="status" className="flex items-start gap-3">
+                <span
+                  aria-hidden="true"
+                  className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
+                  style={{ background: "color-mix(in srgb, var(--color-success) 18%, transparent)", color: "var(--color-success)" }}
+                >
+                  <CheckIcon size={16} />
+                </span>
+                <p style={{ color: "var(--color-text)" }}>
+                  {updateStatus?.text ?? "Your spot already matches this reel. Nothing to update."}
+                </p>
+              </div>
+            ) : (
+              <div role="alert" className="flex flex-col gap-3">
+                <p style={{ color: "var(--color-red-text)" }}>{updateStatus.text}</p>
+                <button type="button" onClick={handleUpdateStats} className="btn-secondary self-start px-5 py-3">
+                  {updateStatsLabel(group.name)}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Joined, but nobody to compare against yet: confirm, then the invite leads */}
         {joinedAlone && isMember && (
@@ -651,7 +782,7 @@ function GroupDetail() {
                 onClick={() => setShowJoinForm(true)}
                 className={`${primary === "add" ? "btn-primary" : "btn-secondary"} w-full py-4`}
               >
-                Add my reel
+                {JOIN_ACTIONS.addReel}
                 <ArrowRightIcon />
               </button>
             )}
@@ -692,7 +823,7 @@ function GroupDetail() {
           )}
 
           {/* The reel on this device isn't the one the group sees */}
-          {(statsOutdated || updateStatus) && (
+          {!autoUpdate && (statsOutdated || updateStatus) && (
             <div className="mt-6 flex flex-col gap-2">
               {statsOutdated && (
                 <>
@@ -705,7 +836,7 @@ function GroupDetail() {
                     disabled={updating}
                     className="btn-secondary self-start px-5 py-3"
                   >
-                    {updating ? "Updating…" : `Update my stats in ${group.name}`}
+                    {updating ? "Updating…" : updateStatsLabel(group.name)}
                   </button>
                 </>
               )}

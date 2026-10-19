@@ -87,6 +87,8 @@ export function Slide6NightOwl({ stats }: Props) {
           />
         </svg>
         <motion.div
+          role="heading"
+          aria-level={2}
           className="absolute bottom-0 inset-x-0 slide-hero font-black text-gradient-red tabular-nums"
           initial={reduce ? false : { opacity: 0, scale: 0.7 }}
           animate={{ opacity: 1, scale: 1 }}

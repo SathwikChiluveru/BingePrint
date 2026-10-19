@@ -128,7 +128,8 @@ export function Slide5BingeBeast({ stats }: Props) {
               <motion.div
                 className="relative slide-hero font-black text-gradient-red tabular-nums origin-left"
                 aria-label={heroAria}
-                role={heroAria ? "img" : undefined}
+                role="heading"
+                aria-level={2}
                 initial={{ opacity: 0, scale: 0.7 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.15, duration: 0.5, ease: EASE_SPRING }}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { parseNetflixCSV, CSVParseError } from "@/lib/csv/parser";
 import { computeWrappedStats } from "@/lib/csv/stats";
@@ -76,6 +76,10 @@ function hasFiles(e: DragEvent) {
 export function useReelUpload() {
   const [state, setState] = useState<ReelUploadState>("idle");
   const [error, setError] = useState<ReelFileError | null>(null);
+  // Non-error note about the drop itself, e.g. which file of several was used.
+  const [notice, setNotice] = useState<string | null>(null);
+  // Set synchronously when a file starts parsing, so a second drop or pick in the meantime is ignored.
+  const parsingRef = useRef(false);
   const router = useRouter();
   const setWrapped = useAutoplayedStore((s) => s.setWrapped);
 
@@ -102,17 +106,20 @@ export function useReelUpload() {
   }, []);
 
   const fail = useCallback((kind: ReelFileErrorKind) => {
+    parsingRef.current = false;
     setError(fileError(kind));
     setState("error");
   }, []);
 
   const processFile = useCallback(
     async (file: File) => {
+      if (parsingRef.current) return;
       if (ZIP_NAME.test(file.name)) return fail("zip");
       if (!CSV_NAME.test(file.name)) return fail("not-csv");
       if (file.size > MAX_BYTES) return fail("too-big");
       if (file.size === 0) return fail("empty");
 
+      parsingRef.current = true;
       setState("parsing");
       setError(null);
       try {
@@ -136,8 +143,12 @@ export function useReelUpload() {
   const onDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
+      // One file at a time: a drop while the last one is still being read is ignored.
+      if (parsingRef.current) return;
       setState("idle");
-      const file = e.dataTransfer.files[0];
+      const files = e.dataTransfer.files;
+      const file = files[0];
+      setNotice(file && files.length > 1 ? `Using the first file: ${file.name}` : null);
       if (file) processFile(file);
     },
     [processFile]
@@ -150,7 +161,7 @@ export function useReelUpload() {
 
   const onDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    e.dataTransfer.dropEffect = "copy";
+    e.dataTransfer.dropEffect = parsingRef.current ? "none" : "copy";
   }, []);
 
   const onDragLeave = useCallback((e: React.DragEvent<HTMLElement>) => {
@@ -164,6 +175,7 @@ export function useReelUpload() {
       const file = e.target.files?.[0];
       // Reset so picking the same file again (e.g. after an error) still fires onChange
       e.target.value = "";
+      setNotice(null);
       if (file) processFile(file);
     },
     [processFile]
@@ -172,6 +184,7 @@ export function useReelUpload() {
   return {
     state,
     error,
+    notice,
     dragging: state === "dragging",
     parsing: state === "parsing",
     processFile,

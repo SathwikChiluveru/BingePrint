@@ -5,16 +5,17 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { isPendingInviteFresh, useAutoplayedStore } from "@/lib/store";
+import { isPendingInviteFresh, updateMyStatsHref, useAutoplayedStore, useMyGroupNeedsUpdate } from "@/lib/store";
 import { renderShareImage } from "@/lib/share/renderShareImage";
 import { isInAppBrowser, safeInviteCode, toGroupSummary } from "@/lib/share/safety";
 import { suggestGroupName, suggestNickname } from "@/components/groups/memberStats";
+import { UserPlusIcon } from "@/components/groups/icons";
 import {
   INVITE_ACTIONS,
-  TEASER_DISCLOSURE,
   createGroupErrorMessage,
   inviteShareText,
   inviteUrl,
+  updateStatsLabel,
 } from "@/lib/copy/invite";
 import { ShareCard, type ShareCardStats } from "../ShareCard";
 
@@ -49,6 +50,11 @@ const RENDER_ERROR = "Couldn't make your card. Try again.";
 const BLOCKED_MESSAGE =
   "Your card is ready, but sharing was blocked. We saved it to your downloads instead.";
 const PRESS_AND_HOLD = "Press and hold the card to save it.";
+// One line at 375px under the create CTA (the long TEASER_DISCLOSURE wraps to two and pushes the
+// secondary row below the fold at 375x548). Same two facts: stats only, and the invite page teaser.
+const SHORT_DISCLOSURE = "Stats, never your file. Invites show your personality.";
+// Signed out, the sign-in step rides in the CTA label instead of an extra helper line.
+const SIGN_IN_AND_START = "Sign in & start my group";
 // A slow or hung group check never holds the CTA longer than this.
 const GROUP_CHECK_TIMEOUT_MS = 8000;
 
@@ -119,6 +125,8 @@ export function Slide10Share({ stats, sessionId, autoCreate = false }: Props) {
   const pendingInvite = useAutoplayedStore((s) => s.pendingInvite);
   const myGroup = useAutoplayedStore((s) => s.myGroup);
   const setMyGroup = useAutoplayedStore((s) => s.setMyGroup);
+  // The stored group holds stats from an older reel: offer to update them, never a second group.
+  const needsUpdate = useMyGroupNeedsUpdate(sessionId);
   // Full stats for the group's wrapped_data; the card itself only needs the ShareCardStats subset
   const wrappedStats = useAutoplayedStore((s) => s.wrappedStats);
   const [share, setShare] = useState<ShareState>({ kind: "idle" });
@@ -507,7 +515,12 @@ export function Slide10Share({ stats, sessionId, autoCreate = false }: Props) {
   // After "Card shared" the group is the obvious next step, so the link steps up to a button.
   const groupLinkPromoted = share.kind === "shared";
   const groupLink =
-    groupLinkReady && groupHref ? (
+    groupLinkReady && groupHref && myGroup && needsUpdate ? (
+      // A newer reel than the one the group has: refresh this member's stats there (secondary).
+      <Link href={updateMyStatsHref(myGroup.id)} className="btn-secondary w-full px-6 py-3">
+        {updateStatsLabel(myGroup.name)}
+      </Link>
+    ) : groupLinkReady && groupHref ? (
       <Link
         href={groupHref}
         className={
@@ -577,22 +590,26 @@ export function Slide10Share({ stats, sessionId, autoCreate = false }: Props) {
     <div className="slide-container slide-stack items-center px-4 md:px-12">
       <div className="w-full max-w-sm flex flex-col items-center text-center">
         {previewUrl && share.kind === "preview" ? (
-          // The rendered PNG itself, so press-and-hold saves the real card in in-app browsers
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={previewUrl}
-            alt={`Your Autoplayed card: ${stats.personality?.trim() || "The Casual Viewer"}. ${PRESS_AND_HOLD}`}
-            width={1080}
-            height={1920}
-            className="h-auto w-auto max-w-full max-h-[52vh] rounded-[20px] short:max-h-[44vh]"
-            style={{ border: "1px solid var(--color-border-strong)", WebkitTouchCallout: "default" }}
-          />
+          <>
+            {/* The card's own heading (its personality) is not on screen while the PNG stands in */}
+            <h2 className="sr-only">Your Autoplayed card</h2>
+            {/* The rendered PNG itself, so press-and-hold saves the real card in in-app browsers */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={previewUrl}
+              alt={`Your Autoplayed card: ${stats.personality?.trim() || "The Casual Viewer"}. ${PRESS_AND_HOLD}`}
+              width={1080}
+              height={1920}
+              className="h-auto w-auto max-w-full max-h-[52vh] rounded-[20px] short:max-h-[44vh]"
+              style={{ border: "1px solid var(--color-border-strong)", WebkitTouchCallout: "default" }}
+            />
+          </>
         ) : (
           <ShareCard stats={stats} inviteCode={inviteCode} ownedByMe={ownedByMe} />
         )}
 
         <motion.div
-          className="mt-5 w-full flex flex-col gap-3 short:mt-3 short:gap-2"
+          className="mt-5 w-full flex flex-col gap-3 short:mt-2 short:gap-2"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5, ease: SMOOTH }}
@@ -622,12 +639,15 @@ export function Slide10Share({ stats, sessionId, autoCreate = false }: Props) {
                 data-slide-primary=""
                 className="btn-primary w-full gap-2 px-6 py-3 disabled:opacity-60 disabled:cursor-wait"
               >
-                <ShareIcon />
-                {creating ? "Starting your group…" : INVITE_ACTIONS.startGroup}
+                <UserPlusIcon />
+                {creating
+                  ? "Starting your group…"
+                  : authUser === null
+                    ? SIGN_IN_AND_START
+                    : INVITE_ACTIONS.startGroup}
               </button>
-              <p className="text-sm leading-snug" style={{ color: "var(--color-muted)", textWrap: "pretty" }}>
-                {TEASER_DISCLOSURE}
-                {authUser === null && " One quick sign-in first."}
+              <p className="text-xs leading-4" style={{ color: "var(--color-muted)", textWrap: "balance" }}>
+                {SHORT_DISCLOSURE}
               </p>
               {/*
                 One secondary row. Joining stays a real button, not a footnote: someone holding a

@@ -54,7 +54,7 @@ function StatBars({ label, statKey, unit }: { label: string; statKey: "titles" |
                   className="h-full origin-left rounded-full"
                   style={{
                     width: `${(value / max) * 100}%`,
-                    background: leader ? "var(--color-track-strong)" : "rgba(255, 255, 255, 0.2)",
+                    background: leader ? "var(--color-track-strong)" : "var(--color-border-strong)",
                   }}
                   initial={{ scaleX: 0.4 }}
                   whileInView={{ scaleX: 1 }}

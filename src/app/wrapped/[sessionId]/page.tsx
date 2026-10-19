@@ -4,8 +4,8 @@ import { Suspense, useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { MotionConfig } from "framer-motion";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { adoptJoinParam, clearMyGroupIfStale, useAutoplayedStore } from "@/lib/store";
-import { SlideShow } from "@/components/wrapped/SlideShow";
+import { adoptJoinParam, useAutoplayedStore } from "@/lib/store";
+import { SlideShow, resetStoredSlide } from "@/components/wrapped/SlideShow";
 import { Slide10Share } from "@/components/wrapped/slides/Slide10Share";
 
 const noopSubscribe = () => () => {};
@@ -66,10 +66,8 @@ function WrappedContent() {
   }, [autoshareInUrl, joinInUrl, params.sessionId, router]);
   const wrappedStats = useAutoplayedStore((s) => s.wrappedStats);
   const sessionId = useAutoplayedStore((s) => s.sessionId);
-  // A group made from an older reel must not hand its code to this one.
-  useEffect(() => {
-    if (sessionId && sessionId === params.sessionId) clearMyGroupIfStale(sessionId);
-  }, [sessionId, params.sessionId]);
+  // A group made from an older reel is kept: slide 10 offers "Update my stats in {group}" instead of
+  // forgetting it (which led to a duplicate group).
   // Stats come from localStorage, so render nothing on the server and decide after hydration
   const isClient = useSyncExternalStore(
     noopSubscribe,
@@ -91,7 +89,11 @@ function WrappedContent() {
         <Slide10Share stats={wrappedStats} sessionId={sessionId} autoCreate />
         <button
           type="button"
-          onClick={() => setAutoshare(false)}
+          onClick={() => {
+            // The reel would otherwise resume on its last stored slide (the card): start at slide 1.
+            resetStoredSlide(sessionId);
+            setAutoshare(false);
+          }}
           className="fixed left-4 z-10 inline-flex items-center min-h-[44px] px-3 text-sm underline-offset-4 hover:underline"
           style={{ top: "calc(8px + env(safe-area-inset-top, 0px))", color: "var(--color-text-secondary)" }}
         >
