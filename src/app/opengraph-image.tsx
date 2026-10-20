@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { ImageResponse } from "next/og";
 
 export const alt =
-  "Sample Autoplayed frame: The Binge Lord, 5,626 titles. Then compare with your friends. Autoplayed is not affiliated with Netflix.";
+  "Autoplayed: Your watch history has some explaining to do. Sample frame: The Binge Lord, 5,626 titles. Then compare with your friends. Not affiliated with Netflix.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -92,7 +92,7 @@ export default async function Image() {
             color: "#8c8c8c",
           }}
         >
-          <div style={{ display: "flex" }}>Your Netflix history, roasted.</div>
+          <div style={{ display: "flex" }}>Your watch history has some explaining to do.</div>
           <div style={{ display: "flex" }}>Not affiliated with Netflix.</div>
         </div>
       </div>

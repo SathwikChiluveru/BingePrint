@@ -45,11 +45,21 @@ typography:
     fontSize: "1.25rem"
     fontWeight: 600
     lineHeight: 1.3
+  body-lg:
+    fontFamily: "-apple-system, BlinkMacSystemFont, \"SF Pro Display\", \"Segoe UI\", system-ui, sans-serif"
+    fontSize: "1.125rem"
+    fontWeight: 400
+    lineHeight: 1.6
   body:
     fontFamily: "-apple-system, BlinkMacSystemFont, \"SF Pro Display\", \"Segoe UI\", system-ui, sans-serif"
     fontSize: "1rem"
     fontWeight: 400
     lineHeight: 1.6
+  small:
+    fontFamily: "-apple-system, BlinkMacSystemFont, \"SF Pro Display\", \"Segoe UI\", system-ui, sans-serif"
+    fontSize: "0.875rem"
+    fontWeight: 400
+    lineHeight: 1.43
   label:
     fontFamily: "-apple-system, BlinkMacSystemFont, \"SF Pro Display\", \"Segoe UI\", system-ui, sans-serif"
     fontSize: "0.75rem"
@@ -195,6 +205,7 @@ One loud red over a stack of near-black grays; everything that is not the hero i
 **The Forced Colors Rule.** Transparent-fill text (`.text-gradient-red`) falls back to `CanvasText` under `forced-colors: active`, so heroes never vanish in Windows High Contrast.
 
 **The Small Red Text Rule.** Red text under 24px uses Reel Red, Text, never Reel Red. Reel Red fails contrast at body sizes.
+- *Named exception, landing nav wordmark (owner-approved):* the landing nav's "Autoplayed" is Reel Red at 20px (`text-xl`), black weight (900). At that weight it reads as a logo mark, and the owner chose the true brand red. Every other small red text, including the landing footer wordmark, uses Reel Red, Text.
 
 ## Typography
 
@@ -215,10 +226,12 @@ One loud red over a stack of near-black grays; everything that is not the hero i
 - **Display** (900, clamp 3rem to 4.5rem, line-height 0.95, -0.03em): Landing hero and slide headlines.
 - **Headline** (700, clamp 1.875rem to 2.25rem, -0.02em): Section titles on landing, groups and compare pages.
 - **Title** (600, 1.25rem): Card titles, show names in lists.
+- **Body large** (400, 1.125rem, Tailwind `text-lg`): Lead paragraphs under page and section headlines (landing hero from `sm`, group teaser, closing call), and the drop zone's file line from `sm`.
 - **Body** (400, 1rem, line-height 1.6): Copy and descriptions in Credits Grey. Cap measure at 60ch.
+- **Small** (400 or 600, 0.875rem, Tailwind `text-sm`): Secondary lines, notes, alerts, table rows, nav and secondary buttons, the lock line. Sample captions use 0.75rem (`text-xs`) in Usher Grey: the Label size without caps or tracking. Nothing goes smaller.
 - **Label** (600, 0.75rem, 0.1em tracking, uppercase): Slide kickers above hero stats and stat-card labels, in Usher Grey. On slides only; never as an eyebrow above a page headline.
 
-Display, Headline and Title ship as Tailwind utilities (`text-display`, `text-headline`, `text-title`, defined in `@theme` in `globals.css` with their line-height and tracking). Use them instead of arbitrary `text-[...]` sizes.
+The ramp has no other steps: no arbitrary `text-[...]` sizes, and nothing below 0.75rem. Display, Headline and Title ship as Tailwind utilities (`text-display`, `text-headline`, `text-title`, defined in `@theme` in `globals.css` with their line-height and tracking). Use them instead of arbitrary `text-[...]` sizes.
 
 ### Named Rules
 **The Size Is The Joke Rule.** The punchline is carried by scale, not decoration. If a hero needs an icon or emoji to land, the number is not big enough.
@@ -237,7 +250,7 @@ Wrapped slides are full-viewport frames (`.slide-container`: fixed, inset 0) tha
 
 **Resume.** The current slide is kept per session in `sessionStorage`, so a reload or app switch reopens the reel where the viewer left it. Storage failures fall back to slide 1. Safe-area insets are counted once, in `.slide-stack`, never again on the slide box.
 
-App pages (landing, upload, groups) use a single centered column: about 72rem for the nav, 48rem for content sections, 36rem for forms like upload. Feature lists are divided rows (a 14rem label column beside body text on desktop), not grids of identical cards.
+App pages (landing, upload, groups) use a single centered column: 72rem (`max-w-6xl`) for the nav, the landing hero and the footer; 64rem (`max-w-5xl`) for landing content sections (How it works, the group teaser), which need room for a text column beside an artifact column; about 48rem for app content (groups, compare); 36rem (`max-w-xl`) for forms like upload. Feature lists are divided rows (a 14rem label column beside body text on desktop), not grids of identical cards.
 
 ## Elevation & Depth
 
@@ -254,7 +267,7 @@ Depth comes from light, not lift. The signature move is a soft radial red glow b
 
 ## Shapes
 
-Gently rounded and consistent: 6px on chips and badges, 12px on buttons and inputs, 16px on cards and panels, 24px on large modals and sample-slide frames, and full pills for progress dots and tags. Borders are always 1px Hairline; there are no thick strokes or side-stripe accents. Wrapped slides are portrait frames, and sample slides on the landing page mirror that 9:16 silhouette.
+Gently rounded and consistent: 6px on chips and badges, 12px on buttons and inputs, 16px on cards and panels, 24px on large modals and sample-slide frames, and full pills for progress dots and tags. Borders are always 1px Hairline; there are no thick strokes or side-stripe accents. Wrapped slides are portrait frames, and sample slides on the landing page mirror that 9:16 silhouette at 24px corners (the hero reel and How it works' sample frames alike).
 
 ## Components
 
@@ -278,15 +291,20 @@ Bold, solid, unmistakable.
 - **Displayed codes:** a code shown for reading or sharing (not typing) is one mono chip (6px radius, Seat Row Raised, 1px Hairline, 0.2em tracking), never a row of per-character boxes, which read as an input to fill in.
 - **Focus:** 2px white focus ring (global `:focus-visible`).
 - **Error:** Error box in Red Wash with a Red Edge border and Reel Red, Text copy, announced with `role="alert"`, plus a line on how to recover.
-- **File drop zones:** the copy names the file: "Drop NetflixViewingHistory.csv" on fine pointers, "Pick NetflixViewingHistory.csv" on coarse ones, never "Drop" on touch (CSS `pointer-coarse:` swaps it, so SSR markup matches). The zone holds a red "Choose file" button as the page's one red thing. One file at a time: drops while parsing are ignored, and a multi-file drop says "Using the first file: {name}" as a `role="status"` note.
+- **File drop zones:** every surface that looks like a drop target is one (it uses `useReelUpload`), and while it is mounted the hook's window guard cancels file drags anywhere else on the page, so a near-miss never opens the file in the tab. The copy names the file: "Drop NetflixViewingHistory.csv" on fine pointers, "Pick NetflixViewingHistory.csv" on coarse ones, never "Drop" on touch (CSS `pointer-coarse:` swaps it, so SSR markup matches). On `/upload` the zone holds a red "Choose file" button as the page's one red thing; the landing's zone (How it works, step 2) uses a secondary "Choose file", since the landing's red belongs to the hero and the closing call. Errors use the same copy everywhere (from the hook) and render directly under the zone. One file at a time: drops while parsing are ignored, and a multi-file drop says "Using the first file: {name}" as a `role="status"` note.
 
 ### Upload Page
-`/upload` is where the landing's "Get my reel" lands, and most first-timers arrive without the file, so a phone's first viewport must carry both the action and the way to get the file. Top to bottom: the shared nav bar (white wordmark, "Back" secondary), a Headline h1 ("Hand over the evidence"), one lock line, the drop zone (20px padding on phones, 40px from `sm`; the file icon shows from `sm` only), one line on what happens next ("Your reel opens right away. No account needed."), then the quick steps, always visible: three numbered items (open netflix.com/viewingactivity in a browser, not the app; Download all at the bottom; pick the file), stacked on phones and in three columns from `sm`. The slower full data request (time-of-day stats) lives in a closed `<details>` below them, never in the first view. The not-affiliated line closes the page.
+`/upload` is where the landing's "Get my reel" lands, and most first-timers arrive without the file, so a phone's first viewport must carry both the action and the way to get the file. Top to bottom: the shared nav bar (white wordmark, "Back" secondary), a Headline h1 ("Hand over the evidence"), one lock line, the drop zone (20px padding on phones, 40px from `sm`; the file icon shows from `sm` only; under the file name a muted line, "or ViewingActivity.csv from a data request"), the error alert directly under the zone when there is one, otherwise one line on what happens next ("Your reel opens right away. No account needed.", hidden while the alert shows), then the quick steps, always visible: three numbered items (open netflix.com/viewingactivity in a browser, not the app; Download all at the bottom; pick the file), stacked on phones and in three columns from `sm`. The slower full data request (time-of-day stats) lives in a closed `<details>` below them, never in the first view. The not-affiliated line closes the page.
 
 ### Navigation
 A thin bar on Screening Room Veil: the Autoplayed wordmark (black weight, links home) on the left and one secondary button on the right. No link rows; the app is a funnel, not a site. On the landing page the wordmark is Reel Red (owner-approved look); app chrome (upload, login, groups) uses Marquee White so it never competes with that page's one red action. `/upload` uses the same sticky bar markup as the landing, with "Back" (home) as its secondary. Slide 1 and the exported PNG mark also use Reel Red.
 
-**The Landing Hero (owner-approved, do not redesign without asking).** The protection covers exactly two things: the hero section in `src/app/page.tsx` (`<section aria-labelledby="hero-heading">`: headline "Your watch history has some explaining to do.", the receipts paragraph, the red "Get my reel" button plus the secondary "Join a friend's group", and the lock line) and `SampleReel.tsx` (the sample reel beside it, with the red glow behind it and red-gradient hero numbers, ending on the group versus frame). The landing nav bar stays as is. In the hero, the red button, the red glow and the reel's red numbers coexist by the owner's choice; this overrides The One Red Thing Rule there only. Everything below the hero (How it works, the group teaser, the closing call) may evolve under the normal rules; the closing call currently repeats the red button over the red glow.
+**The Landing Hero (owner-approved, do not redesign without asking).** The protection covers exactly two things: the hero section in `src/app/page.tsx` (`<section aria-labelledby="hero-heading">`: headline "Your watch history has some explaining to do.", the receipts paragraph, the red "Get my reel" button plus the secondary "Join a friend's group", and the lock line) and `SampleReel.tsx` (the sample reel beside it, with the red glow behind it and red-gradient hero numbers, ending on the group versus frame). The landing nav bar stays as is. In the hero, the red button, the red glow and the reel's red numbers coexist by the owner's choice; this overrides The One Red Thing Rule there only. Everything below the hero (How it works, the group teaser, the closing call) follows the normal rules; the hero exemption does not extend to them.
+
+### Landing Below The Hero
+- **How it works:** four divided rows (number, text, artifact). Step 2's artifact is a real drop zone (see File drop zones) that routes to `/wrapped/{id}` exactly like `/upload`; its copy links `/privacy` inline ("What's kept, exactly"). Step 3 shows two 9:16 sample frames the hero reel never shows (estimated watch time with its "~", the busiest weekday), with one faint `--glow-hero` behind the active frame only. Step 4 says what a group sees: name, stats and personality, never the file.
+- **Group teaser:** one action, the secondary "Join a friend's group"; a muted line points group creation at the reel's last slide. No red button. Its sample numbers come from `sampleData.ts` (`SAMPLE_VERSUS`), and its punchline is its own, never the reel's roommate line.
+- **Closing call:** Display line, one Large body line, the red "Get my reel". No glow: the button is the frame's one red thing.
 
 ### Wrapped Slide (signature)
 A full-screen portrait frame: Screening Room background with a radial red glow centered behind the hero, an uppercase Usher Grey label, the hero stat (pops in with a spring overshoot over about 500ms), then one roast line that fades up about 300ms later. One roast per slide; the only friend dig lives on Personality ("Somebody you know is going to argue with this.", never assuming a group exists; slide 10 sells the group). Centered slides put the glow on the slide; the off-axis slides (Top five and Biggest binge left-aligned, Most loyal right-aligned) anchor it to the hero itself (`HeroGlow`), so it never sits beside the number. Lists inside slides stagger in at 120ms per item, and bars fill over 600ms. Slides transition horizontally over 350ms with a smooth ease. Estimated numbers carry a "~" prefix and a small Usher Grey note; one hedge per number, so a "~" figure never also says "estimated". Every numeric hero is a heading (`role="heading" aria-level={2}`) so screen-reader heading navigation lands on it.
@@ -336,6 +354,16 @@ The group compare page belongs to the Roast Reel, not to a generic dashboard: he
 - **Signed-out invitees go straight to sign-in.** Slide 10's stackUp CTA reads "Sign in to add my reel" and returns to the group with the add form open.
 - **Login.** `--glow-hero` behind the card; the email or Sign in button is the one red action. The intent line names the personality when a reel is on the device. The 6-digit code is the default in in-app browsers and on touch devices, and the link-sent step always shows the code field ("type it in this same browser").
 - **Group member page.** Header: group name at Display (Headline past 24 characters) over `--glow-hero`, then the standings. At most one banner, by priority: update > joined > add my reel > outdated stats. The invite block sits below the standings, except for a member alone in a fresh group. A quiet "New since your last visit: N joined." line comes from a per-device count, members only.
+
+### Rules added in critique round 2 (2026-10-20)
+- **Codes go through `InviteCodeChip`** (inline, md, lg sizes): one mono chip, 0.2em tracking, Seat Row Raised fill, Hairline border, weight 600. The share PNG and the compare PNG draw the same chip.
+- **The invite frame names the inviter.** The h1 reads "{Nickname} is" / "{Personality}" ("Sam is The Binge Lord"), falling back to "Your friend is". The owner's nickname rides in the opt-in teaser, kept in sync by a database trigger. Disclosures say friends with the code see your name and personality.
+- **Names are editable, membership is reversible.** After one-tap create, slide 10 shows prefilled inline "Group name" (owner) and "Your name" fields under "Share it now"; Enter or blur saves, Escape reverts, sharing never waits. The group page has a quiet "Rename group" (owner), a "Your name: X · Edit" line, and "Leave {group}" with an inline confirm at the bottom (an owner who leaves keeps the group).
+- **The group page doesn't repeat compare.** With 2+ members it leads with the head-to-head summary and a top-3 preview (plus the viewer); the full standings and awards live on compare only. Compare puts its h1 first in the DOM.
+- **Slide 10 labels never flicker.** The create CTA reads as signed out until auth resolves and only switches when not focused or pressed. Group names over 24 characters fall back to "your group" in buttons; the card invite label reads "Join {group}".
+- **Exits and skips.** The last slide on phones has a quiet 44px "Home" link opposite Back. With a fresh invite, the intro shows "Skip to {group}" instead of "Skip to my card".
+- **Slide 4 and 5 limits.** With 5 or fewer different titles, slide 4's hero is that count, not a percentage. Date-only slide 5 shows at most 5 text elements.
+- **Personalities.** "The Genre Surfer" is now "The Channel Surfer" (the export has no genre data); The Casual Viewer's line carries no count. `upgradeStoredStats` upgrades older saved and stored stats.
 
 ## Do's and Don'ts
 

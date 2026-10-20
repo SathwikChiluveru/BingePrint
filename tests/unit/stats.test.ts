@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { parseNetflixCSV } from "@/lib/csv/parser";
 import {
+  CASUAL_VIEWER_LINE,
   EMPTY_HISTORY_LINE,
   computeWrappedStats,
   isLikelyMovie,
   playNoun,
   toValidDate,
+  upgradeStoredStats,
   type RankedShowStat,
 } from "@/lib/csv/stats";
 import type { NetflixEntry } from "@/types";
@@ -109,9 +111,11 @@ describe("computeWrappedStats: date-only quick export", () => {
     expect(s.funComparison.match(/~/g)).toHaveLength(1);
   });
 
-  it("falls back to The Casual Viewer with a title count", () => {
+  it("falls back to The Casual Viewer, with no count (the card states the total once)", () => {
     expect(s.personality).toBe("The Casual Viewer");
-    expect(s.personalityDescription).toMatch(/^11 titles, all-time\./);
+    expect(s.personalityDescription).toBe(CASUAL_VIEWER_LINE);
+    expect(s.personalityDescription).not.toMatch(/\d/);
+    expect(s.personalityDescription).not.toMatch(/still watching/i);
   });
 });
 
@@ -280,20 +284,20 @@ describe("computeWrappedStats: personality rules", () => {
     expect(computeWrappedStats(entries).personality).not.toBe("The Loyalist");
   });
 
-  it("Genre Surfer with over 40 distinct shows", () => {
+  it("Channel Surfer with over 40 distinct shows (the export has no genre data)", () => {
     // 41 movies on weekday afternoons, a few days apart
     const entries = Array.from({ length: 41 }, (_, i) =>
       makeEntry({ title: `Film ${i}`, startTime: at(2024, 1, 1 + i * 7, 15), durationSeconds: 1800 })
     );
     const s = computeWrappedStats(entries);
-    expect(s.personality).toBe("The Genre Surfer");
+    expect(s.personality).toBe("The Channel Surfer");
     expect(s.personalityDescription).toMatch(/^41 different shows and movies\./);
   });
 
-  it("Casual Viewer copy uses the singular for one title", () => {
+  it("Casual Viewer copy for one title carries no count", () => {
     const s = computeWrappedStats([makeEntry({ title: "Roma", startTime: at(2024, 1, 1, 15) })]);
     expect(s.personality).toBe("The Casual Viewer");
-    expect(s.personalityDescription).toMatch(/^1 title, all-time\./);
+    expect(s.personalityDescription).toBe(CASUAL_VIEWER_LINE);
   });
 });
 
@@ -340,5 +344,32 @@ describe("toValidDate", () => {
     expect(toValidDate(null)).toBeNull();
     expect(toValidDate(undefined)).toBeNull();
     expect(toValidDate("nope")).toBeNull();
+  });
+});
+
+describe("upgradeStoredStats", () => {
+  it("renames the old Genre Surfer to The Channel Surfer", () => {
+    const old = { personality: "The Genre Surfer", personalityDescription: "41 different shows and movies." };
+    expect(upgradeStoredStats(old)).toEqual({ ...old, personality: "The Channel Surfer" });
+  });
+
+  it("replaces the old counted Casual Viewer line, in any number format", () => {
+    for (const d of [
+      "11 titles, all-time. Netflix keeps asking if you're still watching.",
+      "1 title, all-time. Netflix keeps asking if you're still watching.",
+      "1,234 titles, all-time. Netflix keeps asking if you're still watching.",
+      "1 234 titles, all-time. Netflix keeps asking if you're still watching.",
+    ]) {
+      expect(upgradeStoredStats({ personality: "The Casual Viewer", personalityDescription: d }).personalityDescription).toBe(
+        CASUAL_VIEWER_LINE
+      );
+    }
+  });
+
+  it("returns the same object when nothing needs changing", () => {
+    const current = { personality: "The Loyalist", personalityDescription: "60 plays of Friends." };
+    expect(upgradeStoredStats(current)).toBe(current);
+    const empty = { personality: "The Casual Viewer", personalityDescription: EMPTY_HISTORY_LINE };
+    expect(upgradeStoredStats(empty)).toBe(empty);
   });
 });

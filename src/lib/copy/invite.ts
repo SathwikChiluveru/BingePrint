@@ -72,15 +72,15 @@ export const INVITE_CODE_FORMAT_ERROR =
 
 /** One-tap create on the reel's last slide (teaser is on by default there). */
 export const TEASER_DISCLOSURE =
-  "Starts a group with your stats, never your file. Friends with the code see your personality.";
+  "Starts a group with your stats, never your file. Friends with the code see your name and personality.";
 
 /** Label and disclosure for the teaser checkbox on the /groups create form (pre-checked). */
-export const TEASER_CHECKBOX_LABEL = "Show my personality on the invite page";
+export const TEASER_CHECKBOX_LABEL = "Show my name and personality on the invite page";
 
 export function teaserFormDisclosure(personality: string, hasTimeData: boolean | undefined): string {
   // Only an explicit true means real watch times; anything else leads with the exact title count
   const stat = hasTimeData !== true ? "how many titles you've watched" : "your total hours";
-  return `Anyone with your code sees “${personality}” and ${stat}, even before they sign in. On by default; untick to keep it hidden.`;
+  return `Anyone with your code sees your name, “${personality}” and ${stat}, even before they sign in. On by default; untick to keep it hidden.`;
 }
 
 /** Group page line for members who joined since this device last opened the group. */
@@ -164,3 +164,56 @@ export function createGroupErrorMessage(status: number): string {
  */
 export const CREATE_GROUP_INCOMPLETE_MESSAGE =
   "The group didn't finish setting up. Try again; if it keeps happening, reload the page.";
+
+/**
+ * Owner rename (PATCH /api/groups/[id]) errors by status. 0 = the request never reached us.
+ */
+export function renameGroupErrorMessage(status: number): string {
+  if (status === 0) return "Couldn't reach Autoplayed. Check your connection and try again.";
+  if (status === 401) return "Your sign-in expired. Sign in again, then rename the group.";
+  if (status === 403) return "Only the person who started the group can rename it.";
+  if (status === 404) return "This group no longer exists, or you're not in it.";
+  if (status === 422) return "Group names are 1 to 60 characters.";
+  if (status === 429) return "That's a lot of renames. Wait a few minutes, then try again.";
+  return "Couldn't rename the group. The old name is still there. Try again.";
+}
+
+/** Nickname edit (PUT /api/groups/[id]/members/me with { nickname }) errors by status. */
+export function nicknameErrorMessage(status: number): string {
+  if (status === 0) return "Couldn't reach Autoplayed. Check your connection and try again.";
+  if (status === 401) return "Your sign-in expired. Sign in again, then change your name.";
+  if (status === 404) return "You're not in this group anymore. Refresh the page.";
+  if (status === 422) return "Names are 1 to 30 characters.";
+  if (status === 429) return "Too many changes. Wait a minute, then try again.";
+  return "Couldn't change your name. The old one is still there. Try again.";
+}
+
+/** Leave (DELETE /api/groups/[id]/members/me) errors by status. */
+export function leaveGroupErrorMessage(status: number): string {
+  if (status === 0) return "Couldn't reach Autoplayed. Check your connection and try again.";
+  if (status === 401) return "Your sign-in expired. Sign in again, then leave the group.";
+  if (status === 404) return "You're not in this group anymore. Refresh the page.";
+  if (status === 429) return "Too many tries. Wait a minute, then try again.";
+  return "Couldn't leave the group. You're still in it. Try again.";
+}
+
+/** "Leave {group}", shortened for long names. */
+export function leaveGroupLabel(groupName: string | null | undefined): string {
+  return `Leave ${groupNameForButton(groupName, "this group")}`;
+}
+
+/**
+ * Inline confirm under "Leave {group}". Owners keep the group (it stays theirs, the code still
+ * works), so they get their own line.
+ */
+export function leaveGroupConfirmLine(ownedByMe: boolean): string {
+  return ownedByMe
+    ? "Your name and stats come off the board. The group stays yours and the invite code keeps working; you can add your reel again later."
+    : "Your name and stats come off the board. To come back you'll need the invite code again.";
+}
+
+/** Invite kicker: "Sam is" with the owner's nickname, else "Your friend is". */
+export function inviterKicker(nickname: string | null | undefined): string {
+  const name = (nickname ?? "").trim();
+  return name ? `${name} is` : "Your friend is";
+}

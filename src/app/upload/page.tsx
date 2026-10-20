@@ -151,6 +151,11 @@ export default function UploadPage() {
                         </>
                       )}
                     </span>
+                    {!dragging && (
+                      <span id="upload-alt" className="-mt-2 block text-sm sm:-mt-3" style={{ color: "var(--color-muted)" }}>
+                        or <span style={mono}>ViewingActivity.csv</span> from a data request
+                      </span>
+                    )}
                     <span className="btn-primary min-h-12 w-full px-6 text-base sm:w-auto">Choose file</span>
                     <input
                       id="csv-input"
@@ -158,7 +163,7 @@ export default function UploadPage() {
                       accept=".csv,text/csv"
                       className="sr-only"
                       onChange={onFileInput}
-                      aria-describedby={state === "error" ? "upload-next upload-error" : "upload-next"}
+                      aria-describedby={state === "error" ? "upload-error" : "upload-alt upload-next"}
                     />
                   </motion.label>
                 )}
@@ -183,21 +188,12 @@ export default function UploadPage() {
               </AnimatePresence>
             </div>
 
-            <p id="upload-next" className="mt-3 text-center text-sm" style={{ color: "var(--color-text-secondary)" }}>
-              Your reel opens right away. No account needed.
-            </p>
-
-            {notice && (
-              <p role="status" className="mt-3 text-center text-sm break-words" style={{ color: "var(--color-text-secondary)" }}>
-                {notice}
-              </p>
-            )}
-
+            {/* The alert sits right under the zone and replaces the "what happens next" line while it shows */}
             {state === "error" && error && (
               <motion.div
                 id="upload-error"
                 role="alert"
-                className="mt-4 rounded-xl p-4 text-sm"
+                className="mt-3 rounded-xl p-4 text-sm"
                 style={{
                   background: "var(--color-red-subtle)",
                   color: "var(--color-red-text)",
@@ -212,6 +208,18 @@ export default function UploadPage() {
                   {error.recovery}
                 </p>
               </motion.div>
+            )}
+
+            {state !== "error" && (
+              <p id="upload-next" className="mt-3 text-center text-sm" style={{ color: "var(--color-text-secondary)" }}>
+                Your reel opens right away. No account needed.
+              </p>
+            )}
+
+            {notice && (
+              <p role="status" className="mt-3 text-center text-sm break-words" style={{ color: "var(--color-text-secondary)" }}>
+                {notice}
+              </p>
             )}
 
             {/* Most first-timers arrive without the file: the quick steps sit right under the zone, always visible */}

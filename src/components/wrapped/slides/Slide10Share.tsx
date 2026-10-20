@@ -15,10 +15,18 @@ import {
   INVITE_ACTIONS,
   JOIN_ACTIONS,
   createGroupErrorMessage,
+  groupNameForButton,
   inviteShareText,
   inviteUrl,
   updateStatsLabel,
 } from "@/lib/copy/invite";
+import {
+  GROUP_NAME_MAX_LENGTH,
+  NICKNAME_MAX_LENGTH,
+  renameGroup,
+  updateNickname,
+} from "@/lib/supabase/groups";
+import { upgradeStoredStats } from "@/lib/csv/stats";
 import { ShareCard, type ShareCardStats } from "../ShareCard";
 
 const SMOOTH = [0.4, 0, 0.2, 1] as const;
@@ -54,7 +62,7 @@ const BLOCKED_MESSAGE =
 const PRESS_AND_HOLD = "Press and hold the card to save it.";
 // One line at 375px under the create CTA (the long TEASER_DISCLOSURE wraps to two and pushes the
 // secondary row below the fold at 375x548). Same two facts: stats only, and the invite page teaser.
-const SHORT_DISCLOSURE = "Stats, never your file. Invites show your personality.";
+const SHORT_DISCLOSURE = "Stats, never your file. Invites show your name and personality.";
 // A slow or hung group check stops waiting after this. The card can be shared without its code
 // meanwhile, so the check never holds the CTA.
 const GROUP_CHECK_TIMEOUT_MS = 4000;
@@ -121,6 +129,96 @@ interface Invite {
   url: string;
 }
 
+interface InlineFieldProps {
+  id: string;
+  label: string;
+  value: string;
+  maxLength: number;
+  /** Saves a changed, trimmed value. Resolves to an error message, or null when it saved. */
+  onSave: (next: string) => Promise<string | null>;
+}
+
+/**
+ * A prefilled value that reads as text and edits in place: Enter or leaving the field saves,
+ * Escape puts the saved value back. The parent saves optimistically, so `value` already shows the
+ * new text while the request runs; a failure reverts it and the message shows under the field.
+ * Never holds up sharing: the share button works whatever state this is in.
+ */
+function InlineField({ id, label, value, maxLength, onSave }: InlineFieldProps) {
+  const [draft, setDraft] = useState(value);
+  const [error, setError] = useState<string | null>(null);
+  // Follow the saved value (a revert after a failed save, or the stored name coming back trimmed)
+  const [shown, setShown] = useState(value);
+  if (shown !== value) {
+    setShown(value);
+    setDraft(value);
+  }
+  const skipBlurRef = useRef(false);
+
+  function commit() {
+    const next = draft.trim();
+    if (!next || next === value) {
+      // Empty never saves: the field goes back to the name it has.
+      setDraft(value);
+      return;
+    }
+    setError(null);
+    setDraft(next);
+    void onSave(next).then((message) => setError(message));
+  }
+
+  const errorId = `${id}-error`;
+  return (
+    <div className="w-full text-left">
+      <div className="flex items-center gap-3">
+        <label htmlFor={id} className="w-24 shrink-0 text-sm" style={{ color: "var(--color-muted)" }}>
+          {label}
+        </label>
+        <input
+          id={id}
+          type="text"
+          value={draft}
+          maxLength={maxLength}
+          autoComplete="off"
+          enterKeyHint="done"
+          spellCheck={false}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              e.currentTarget.blur();
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              skipBlurRef.current = true;
+              setDraft(value);
+              setError(null);
+              e.currentTarget.blur();
+            }
+          }}
+          onBlur={() => {
+            if (skipBlurRef.current) {
+              skipBlurRef.current = false;
+              return;
+            }
+            commit();
+          }}
+          // Reads as a value, not a form: a hairline under it, the full field only on hover or focus.
+          // The focus ring comes from the global :focus-visible.
+          className="min-w-0 flex-1 min-h-[44px] rounded-[6px] border border-transparent border-b-[var(--color-border-strong)] bg-transparent px-2 text-base font-semibold transition-colors hover:border-[var(--color-border)] focus:border-[var(--color-border-strong)] focus:bg-[var(--color-surface-2)]"
+          style={{ color: "var(--color-text)" }}
+        />
+      </div>
+      {error && (
+        <p id={errorId} role="alert" className="mt-1 pl-[6.75rem] text-sm" style={{ color: "var(--color-red-text)" }}>
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function Slide10Share({ stats, sessionId, autoCreate = false }: Props) {
   const router = useRouter();
   const pendingInvite = useAutoplayedStore((s) => s.pendingInvite);
@@ -141,6 +239,8 @@ export function Slide10Share({ stats, sessionId, autoCreate = false }: Props) {
   const [unconfirmedGroupId, setUnconfirmedGroupId] = useState<string | null>(null);
   // Name of the group this slide just created; switches the CTA to "Share it now"
   const [createdName, setCreatedName] = useState<string | null>(null);
+  // The nickname that group was created with: shown, editable, beside the group name
+  const [createdNickname, setCreatedNickname] = useState<string | null>(null);
 
   // An invite the user arrived through, for a group they have not made their own yet, wins:
   // the comparison is what they came for. Otherwise a group of their own turns sharing into inviting.
@@ -213,7 +313,9 @@ export function Slide10Share({ stats, sessionId, autoCreate = false }: Props) {
 
   // Pre-render the PNG so the click can call navigator.share synchronously. iOS Safari drops the
   // tap's user activation across a slow await (or a network request) and rejects share().
-  const renderKey = `${inviteCode ?? ""}|${ownedByMe ? 1 : 0}`;
+  // The card's invite label carries the group name, so a rename re-renders the PNG too
+  const cardGroupName = inviteCode ? (myGroup?.name ?? null) : null;
+  const renderKey = `${inviteCode ?? ""}|${ownedByMe ? 1 : 0}|${cardGroupName ?? ""}`;
   const [readyKey, setReadyKey] = useState<string | null>(null);
   const blobReady = readyKey === renderKey;
   const blobRef = useRef<Blob | null>(null);
@@ -224,7 +326,7 @@ export function Slide10Share({ stats, sessionId, autoCreate = false }: Props) {
     if (emptyReel) return;
     let current = true;
     blobRef.current = null;
-    const pending = renderShareImage(stats, { inviteCode, ownedByMe });
+    const pending = renderShareImage(stats, { inviteCode, ownedByMe, groupName: cardGroupName });
     pendingRef.current = pending;
     pending.then(
       (blob) => {
@@ -240,7 +342,7 @@ export function Slide10Share({ stats, sessionId, autoCreate = false }: Props) {
     return () => {
       current = false;
     };
-  }, [stats, inviteCode, ownedByMe, renderKey, emptyReel]);
+  }, [stats, inviteCode, ownedByMe, cardGroupName, renderKey, emptyReel]);
 
   function goToSignIn() {
     const back = sessionId ? `/wrapped/${sessionId}?autoshare=1` : "/groups?mode=create";
@@ -251,6 +353,8 @@ export function Slide10Share({ stats, sessionId, autoCreate = false }: Props) {
   /** Caller holds creatingRef; returns true when the group exists and has this user's stats. */
   async function createGroup(user: AuthUser): Promise<boolean> {
     setShare({ kind: "creating" });
+    // Suggested, then shown as editable fields under "Share it now" so nothing is named silently
+    const nickname = suggestNickname(user) || "Me";
     let res: Response;
     try {
       res = await fetch("/api/groups", {
@@ -258,9 +362,10 @@ export function Slide10Share({ stats, sessionId, autoCreate = false }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: suggestGroupName(stats.personality) || FALLBACK_GROUP_NAME,
-          nickname: suggestNickname(user) || "Me",
-          // Summary only: the per-binge session list never leaves the device
-          wrapped_data: toGroupSummary(wrappedStats ?? stats),
+          nickname,
+          // Summary only: the per-binge session list never leaves the device. Older stored stats
+          // get the current personality wording first.
+          wrapped_data: toGroupSummary(upgradeStoredStats(wrappedStats ?? stats)),
           // The invite page shows the owner's personality as a hook; the server builds that teaser
           // from wrapped_data. Disclosed in the helper line under the button.
           share_teaser: true,
@@ -275,7 +380,13 @@ export function Slide10Share({ stats, sessionId, autoCreate = false }: Props) {
       goToSignIn();
       return false;
     }
-    let group: { id?: unknown; invite_code?: unknown; name?: unknown; warning?: unknown } | null = null;
+    let group: {
+      id?: unknown;
+      invite_code?: unknown;
+      name?: unknown;
+      warning?: unknown;
+      members?: unknown;
+    } | null = null;
     try {
       group = await res.json();
     } catch {
@@ -291,9 +402,50 @@ export function Slide10Share({ stats, sessionId, autoCreate = false }: Props) {
     const name = typeof group.name === "string" && group.name ? group.name : FALLBACK_GROUP_NAME;
     setCheckedGroupId(group.id);
     setMyGroup({ id: group.id, inviteCode: code, name, ownedByMe: true });
+    // The stored nickname (trimmed by the server) when the body carries it
+    const first = Array.isArray(group.members) ? (group.members[0] as { nickname?: unknown } | undefined) : undefined;
+    setCreatedNickname(typeof first?.nickname === "string" && first.nickname ? first.nickname : nickname);
     setCreatedName(name);
     setShare({ kind: "idle" });
     return true;
+  }
+
+  /** Optimistic rename: the card and share text use the new name at once; a failure puts it back. */
+  async function saveGroupName(next: string): Promise<string | null> {
+    const group = useAutoplayedStore.getState().myGroup;
+    if (!group) return null;
+    const previous = group.name;
+    setMyGroup({ ...group, name: next });
+    setCreatedName(next);
+    const res = await renameGroup(group.id, next);
+    const now = useAutoplayedStore.getState().myGroup;
+    if (res.ok) {
+      if (now?.id === group.id && now.name !== res.name) setMyGroup({ ...now, name: res.name });
+      if (now?.id === group.id) setCreatedName(res.name);
+      return null;
+    }
+    // Only revert when nothing newer replaced it meanwhile
+    if (now?.id === group.id && now.name === next) {
+      setMyGroup({ ...now, name: previous });
+      setCreatedName(previous);
+    }
+    return res.message;
+  }
+
+  /** Optimistic nickname change; a failure puts the old one back. */
+  async function saveNickname(next: string): Promise<string | null> {
+    const group = useAutoplayedStore.getState().myGroup;
+    if (!group) return null;
+    const previous = createdNickname;
+    setCreatedNickname(next);
+    const res = await updateNickname(group.id, next);
+    if (res.ok) {
+      const stored = typeof res.member?.nickname === "string" ? res.member.nickname : next;
+      setCreatedNickname((cur) => (cur === next ? stored : cur));
+      return null;
+    }
+    setCreatedNickname((cur) => (cur === next ? previous : cur));
+    return res.message;
   }
 
   async function runCreate(knownUser?: AuthUser | null) {
@@ -319,6 +471,14 @@ export function Slide10Share({ stats, sessionId, autoCreate = false }: Props) {
 
   // Card shared with no group yet: the next step is starting one, so the CTA takes focus
   const createRef = useRef<HTMLButtonElement | null>(null);
+
+  // The create CTA reads as signed out until the session is known (undefined counts as signed out),
+  // and only switches to the signed-in wording while it is neither focused nor pressed, so the label
+  // never changes under the thumb. A tap before then still works: runCreate reads the session itself.
+  const [ctaHeld, setCtaHeld] = useState(false);
+  const [ctaSignedIn, setCtaSignedIn] = useState(false);
+  if (!ctaHeld && ctaSignedIn !== !!authUser) setCtaSignedIn(!!authUser);
+  const createLabel = ctaSignedIn ? INVITE_ACTIONS.startGroup : GROUP_ACTIONS.signInAndStart;
   useEffect(() => {
     if (share.kind === "shared" && mode === "create") createRef.current?.focus();
   }, [share.kind, mode]);
@@ -441,7 +601,8 @@ export function Slide10Share({ stats, sessionId, autoCreate = false }: Props) {
     // Not rendered yet (or the render failed): render now. If the browser then refuses the
     // late share() call, deliver() falls back to a download.
     setShare({ kind: "busy" });
-    const pending = pendingRef.current ?? renderShareImage(stats, { inviteCode, ownedByMe });
+    const pending =
+      pendingRef.current ?? renderShareImage(stats, { inviteCode, ownedByMe, groupName: cardGroupName });
     pendingRef.current = pending;
     pending.then(
       (blob) => {
@@ -614,7 +775,7 @@ export function Slide10Share({ stats, sessionId, autoCreate = false }: Props) {
             />
           </>
         ) : (
-          <ShareCard stats={stats} inviteCode={inviteCode} ownedByMe={ownedByMe} />
+          <ShareCard stats={stats} inviteCode={inviteCode} ownedByMe={ownedByMe} groupName={cardGroupName} />
         )}
 
         <motion.div
@@ -637,7 +798,7 @@ export function Slide10Share({ stats, sessionId, autoCreate = false }: Props) {
                 </Link>
               ) : (
                 <Link href={stackUpHref} data-slide-primary="" className="btn-primary w-full px-6 py-3">
-                  See how you stack up in {freshInvite.groupName ?? "your group"}
+                  See how you stack up in {groupNameForButton(freshInvite.groupName)}
                 </Link>
               )}
               {shareButton(false)}
@@ -649,17 +810,19 @@ export function Slide10Share({ stats, sessionId, autoCreate = false }: Props) {
                 ref={createRef}
                 type="button"
                 onClick={handleCreateAndInvite}
+                onFocus={() => setCtaHeld(true)}
+                onBlur={() => setCtaHeld(false)}
+                onPointerDown={() => setCtaHeld(true)}
+                onPointerLeave={() => {
+                  if (document.activeElement !== createRef.current) setCtaHeld(false);
+                }}
                 disabled={creating}
                 aria-busy={creating}
                 data-slide-primary=""
                 className="btn-primary w-full gap-2 px-6 py-3 disabled:opacity-60 disabled:cursor-wait"
               >
                 <UserPlusIcon />
-                {creating
-                  ? "Starting your group…"
-                  : authUser === null
-                    ? GROUP_ACTIONS.signInAndStart // signed out: the sign-in step rides in the label
-                    : INVITE_ACTIONS.startGroup}
+                {creating ? "Starting your group…" : createLabel}
               </button>
               <p className="text-xs leading-4" style={{ color: "var(--color-muted)", textWrap: "balance" }}>
                 {SHORT_DISCLOSURE}
@@ -688,7 +851,35 @@ export function Slide10Share({ stats, sessionId, autoCreate = false }: Props) {
               </div>
             </>
           ) : (
-            shareButton(true)
+            <>
+              {shareButton(true)}
+              {/*
+                Just created: the suggested group name and nickname, shown and editable in place, so
+                nothing is named silently. "Share it now" above accepts them as they are.
+              */}
+              {createdName && myGroup && (
+                <div className="w-full flex flex-col gap-1">
+                  {ownedByMe && (
+                    <InlineField
+                      id="created-group-name"
+                      label="Group name"
+                      value={myGroup.name}
+                      maxLength={GROUP_NAME_MAX_LENGTH}
+                      onSave={saveGroupName}
+                    />
+                  )}
+                  {createdNickname !== null && (
+                    <InlineField
+                      id="created-nickname"
+                      label="Your name"
+                      value={createdNickname}
+                      maxLength={NICKNAME_MAX_LENGTH}
+                      onSave={saveNickname}
+                    />
+                  )}
+                </div>
+              )}
+            </>
           )}
 
           <p className="sr-only" aria-live="polite" aria-atomic="true">

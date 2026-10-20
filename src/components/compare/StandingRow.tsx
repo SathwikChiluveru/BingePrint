@@ -76,11 +76,20 @@ export function metricNote({ metric, ranked }: NoteInput) {
   return `Ranked by titles, each counted once per day it was watched. ${why}${older}`;
 }
 
-export function StandingsList({ ranked, metric }: NoteInput) {
+/**
+ * Ranked rows plus the metric footnote. `limit` shows only the top N (the group page's preview of
+ * the standings; compare shows everyone); the viewer's own row is appended when it falls outside,
+ * keeping its real rank number. The footnote always describes the whole group.
+ */
+export function StandingsList({ ranked, metric, limit }: NoteInput & { limit?: number }) {
+  const shown =
+    limit === undefined || ranked.length <= limit
+      ? ranked
+      : [...ranked.slice(0, limit), ...ranked.slice(limit).filter((r) => r.isMe)];
   return (
     <>
       <ol className="divide-y divide-[var(--color-border)] border-y border-[var(--color-border)]">
-        {ranked.map((row) => (
+        {shown.map((row) => (
           <StandingRow key={row.member.id} row={row} metric={metric} />
         ))}
       </ol>

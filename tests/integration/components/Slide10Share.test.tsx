@@ -13,6 +13,8 @@ import { primaries, renderCalm, stubBrowser } from "./helpers";
 const h = vi.hoisted(() => ({
   push: null as unknown as ReturnType<typeof import("vitest").vi.fn>,
   user: null as null | { id: string; email?: string },
+  /** Set to hold the session read open (auth still resolving) */
+  getUser: null as null | (() => Promise<{ data: { user: null | { id: string; email?: string } } }>),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -31,7 +33,9 @@ vi.mock("next/link", () => ({
   },
 }));
 vi.mock("@/lib/supabase/client", () => ({
-  createClient: () => ({ auth: { getUser: async () => ({ data: { user: h.user } }) } }),
+  createClient: () => ({
+    auth: { getUser: () => (h.getUser ? h.getUser() : Promise.resolve({ data: { user: h.user } })) },
+  }),
 }));
 vi.mock("@/lib/share/renderShareImage", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/share/renderShareImage")>();
@@ -71,6 +75,7 @@ beforeEach(() => {
   localStorage.clear();
   h.push = vi.fn();
   h.user = { id: "u1", email: "sam@example.test" };
+  h.getUser = null;
   fetchMock = vi.fn(async () => respond(200, { members: [] }));
   vi.stubGlobal("fetch", fetchMock);
   shareMock = vi.fn(async () => {});
@@ -128,6 +133,82 @@ describe("create mode (no group, no invite)", () => {
     expect(useAutoplayedStore.getState().myGroup).toMatchObject({ id: GROUP.id, inviteCode: GROUP.inviteCode, ownedByMe: true });
   });
 
+  it("reads signed out until the session is known, so the label never flips signed-out to signed-in late", async () => {
+    let resolveUser: (v: { data: { user: typeof h.user } }) => void = () => {};
+    const pending = new Promise<{ data: { user: typeof h.user } }>((r) => (resolveUser = r));
+    h.getUser = () => pending;
+    seed({});
+    show();
+    const cta = screen.getByRole("button", { name: "Sign in and start my group" });
+    // Focused when the session resolves: the label holds until it loses focus
+    act(() => cta.focus());
+    await act(async () => resolveUser({ data: { user: h.user } }));
+    expect(cta).toHaveTextContent("Sign in and start my group");
+    act(() => cta.blur());
+    expect(cta).toHaveTextContent(INVITE_ACTIONS.startGroup);
+  });
+
+  it("after a create, the group name and nickname show prefilled; Enter renames, card follows", async () => {
+    seed({});
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (init?.method === "POST")
+        return respond(201, {
+          id: GROUP.id,
+          invite_code: GROUP.inviteCode,
+          name: "Couch Club",
+          members: [{ nickname: "sam" }],
+        });
+      if (init?.method === "PATCH") return respond(200, { name: "Sofa Kings" });
+      return respond(200, {});
+    });
+    show();
+    await userEvent.click(await screen.findByRole("button", { name: INVITE_ACTIONS.startGroup }));
+    const shareNow = await screen.findByRole("button", { name: "Share it now" });
+    const name = screen.getByLabelText("Group name") as HTMLInputElement;
+    const nick = screen.getByLabelText("Your name") as HTMLInputElement;
+    expect(name.value).toBe("Couch Club");
+    expect(nick.value).toBe("sam");
+    expect(screen.getByText("Join Couch Club")).toBeInTheDocument();
+
+    await userEvent.clear(name);
+    await userEvent.type(name, "Sofa Kings{Enter}");
+    const patch = fetchMock.mock.calls.find(([, i]) => (i as RequestInit | undefined)?.method === "PATCH");
+    expect(patch?.[0]).toBe(`/api/groups/${GROUP.id}`);
+    expect(JSON.parse((patch?.[1] as RequestInit).body as string)).toEqual({ name: "Sofa Kings" });
+    // Optimistic: the card label, the store and the PNG all carry the new name
+    expect(await screen.findByText("Join Sofa Kings")).toBeInTheDocument();
+    expect(useAutoplayedStore.getState().myGroup?.name).toBe("Sofa Kings");
+    await waitFor(() =>
+      expect(renderShareImage).toHaveBeenLastCalledWith(stats, {
+        inviteCode: GROUP.inviteCode,
+        ownedByMe: true,
+        groupName: "Sofa Kings",
+      })
+    );
+    // Sharing was never blocked
+    expect(shareNow).not.toHaveAttribute("aria-disabled");
+  });
+
+  it("a failed nickname change reverts and says why, inline", async () => {
+    seed({});
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (init?.method === "POST")
+        return respond(201, { id: GROUP.id, invite_code: GROUP.inviteCode, name: "Couch Club", members: [{ nickname: "sam" }] });
+      if (init?.method === "PUT") return respond(422, {});
+      return respond(200, {});
+    });
+    show();
+    await userEvent.click(await screen.findByRole("button", { name: INVITE_ACTIONS.startGroup }));
+    await screen.findByRole("button", { name: "Share it now" });
+    const nick = screen.getByLabelText("Your name") as HTMLInputElement;
+    await userEvent.clear(nick);
+    await userEvent.type(nick, "Samwise");
+    act(() => nick.blur());
+    expect(await screen.findByText("Names are 1 to 30 characters.")).toBeInTheDocument();
+    await waitFor(() => expect(nick.value).toBe("sam"));
+    expect(screen.getByRole("button", { name: "Share it now" })).toBeInTheDocument();
+  });
+
   it("a 201 carrying a warning is a failure: no code, error shown", async () => {
     seed({});
     fetchMock.mockImplementation(async () =>
@@ -151,6 +232,14 @@ describe("stackUp mode (fresh invite)", () => {
     const share = screen.getByRole("button", { name: INVITE_ACTIONS.shareCard });
     expect(share).toHaveClass("btn-secondary");
     expect(screen.queryByText(/ABCD1234EF/)).toBeNull();
+  });
+
+  it("a long group name gives way to 'your group' in the CTA", async () => {
+    seed({
+      pendingInvite: { code: "abcd1234ef", groupName: "The Extremely Long Film Night Society", savedAt: Date.now() },
+    });
+    show();
+    expect(await screen.findByRole("link", { name: "See how you stack up in your group" })).toBeInTheDocument();
   });
 
   it("links straight to the group when its id is known", async () => {
@@ -197,7 +286,8 @@ describe("has-group mode", () => {
     expect(fetchMock).toHaveBeenCalledWith(`/api/groups/${GROUP.id}`);
     expect(screen.getByRole("link", { name: "Open Couch Club" })).toHaveAttribute("href", `/groups/${GROUP.id}`);
 
-    await waitFor(() => expect(renderShareImage).toHaveBeenLastCalledWith(stats, { inviteCode: GROUP.inviteCode, ownedByMe: true }));
+    await waitFor(() => expect(renderShareImage).toHaveBeenLastCalledWith(stats, { inviteCode: GROUP.inviteCode, ownedByMe: true, groupName: "Couch Club" })
+    );
     await userEvent.click(cta);
     await waitFor(() => expect(shareMock).toHaveBeenCalledTimes(1));
     const data = shareMock.mock.calls[0][0] as ShareData;

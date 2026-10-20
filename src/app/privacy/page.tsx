@@ -8,11 +8,11 @@ export const metadata: Metadata = {
 };
 
 // TODO(owner): replace with a real inbox you check before launch. Deletion requests go here
-// because there is no in-app "leave group", "delete group" or "delete account" button yet.
+// because there is no in-app "delete group" or "delete account" button yet ("Leave" exists).
 const CONTACT_EMAIL = "privacy@example.com";
 
-const LAST_UPDATED = "2026-10-19";
-const LAST_UPDATED_LABEL = "19 October 2026";
+const LAST_UPDATED = "2026-10-20";
+const LAST_UPDATED_LABEL = "20 October 2026";
 
 const link = "underline underline-offset-4 decoration-[var(--color-border-strong)] hover:decoration-current";
 
@@ -128,6 +128,8 @@ export default function PrivacyPage() {
               </li>
               <li>
                 <Strong>For groups you create:</Strong> the group&apos;s name, its invite code, and that you own it.
+                If you turn the invite teaser on, also your nickname, personality label and one headline number,
+                copied for the invite page.
               </li>
             </List>
             <p>
@@ -144,9 +146,10 @@ export default function PrivacyPage() {
               </li>
               <li>
                 <Strong>Anyone with the invite code</Strong>, signed in or not, can see the group&apos;s name. If the
-                owner opted in, they also see a teaser: the owner&apos;s personality label and one headline number.
-                The teaser is on by default when you start a group: the last card of your reel says so, and the
-                create form on the Groups page has a checkbox to turn it off.
+                owner opted in, they also see a teaser: the owner&apos;s nickname in the group, their personality label
+                and one headline number (for example &ldquo;Sam is The Binge Lord&rdquo;). If the owner changes their
+                nickname, the teaser follows. The teaser is on by default when you start a group: the last card of
+                your reel says so, and the create form on the Groups page has a checkbox to turn it off.
               </li>
             </List>
             <p>Treat an invite code like a link to a group chat: anyone you give it to can join.</p>
@@ -170,6 +173,19 @@ export default function PrivacyPage() {
             </p>
           </Section>
 
+          <Section id="changes" title="Changing names">
+            <List>
+              <li>
+                <Strong>Your nickname:</Strong> any member can change their own name in a group from the group page.
+                Members see the new name right away.
+              </li>
+              <li>
+                <Strong>The group&apos;s name:</Strong> only the person who started the group can rename it. Everyone
+                in the group, and anyone with the invite code, sees the new name.
+              </li>
+            </List>
+          </Section>
+
           <Section id="delete" title="Removing your data">
             <List>
               <li>
@@ -177,13 +193,19 @@ export default function PrivacyPage() {
                 reel, saved invite and group shortcut. Uploading a different file replaces the reel.
               </li>
               <li>
-                <Strong>Groups and your account:</Strong> there is no button yet to leave a group, delete one, or
-                delete your account. Email{" "}
+                <Strong>Leaving a group:</Strong> the &ldquo;Leave&rdquo; button at the bottom of a group&apos;s page
+                deletes your nickname and stats from that group straight away. To come back you need the invite code
+                again. If you started the group, it stays yours after you leave: the invite code keeps working, you
+                can add your reel again later, and an invite teaser you turned on keeps showing the nickname and
+                personality it last had.
+              </li>
+              <li>
+                <Strong>Deleting a group or your account:</Strong> there is no button for these yet. Email{" "}
                 <a href={`mailto:${CONTACT_EMAIL}`} className={link} style={{ color: "var(--color-text)" }}>
                   {CONTACT_EMAIL}
                 </a>{" "}
-                from the address you signed in with, and say which groups. We&apos;ll remove your nickname and stats
-                from them, or your whole account. Deleting a group you own removes every member&apos;s stats in it.
+                from the address you signed in with, and say which groups. We&apos;ll delete them, or your whole
+                account. Deleting a group you own removes every member&apos;s stats in it.
               </li>
             </List>
           </Section>

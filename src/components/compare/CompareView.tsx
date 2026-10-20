@@ -4,6 +4,7 @@ import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import type { Group } from "@/types";
 import InviteActions from "@/components/groups/InviteActions";
+import { JOIN_ACTIONS } from "@/lib/copy/invite";
 import { ArrowRightIcon, CheckIcon } from "@/components/groups/icons";
 import Approx from "./Approx";
 import BackLink from "./BackLink";
@@ -56,55 +57,58 @@ export default function CompareView({
           </motion.p>
         )}
 
-        {/* Kicker, then the hero, then the roast: the headline never spoils the number */}
-        <div className="relative flex flex-col items-center py-6 text-center">
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-x-[-1rem] inset-y-[-2rem]"
-            style={{ background: "var(--glow-hero)" }}
-          />
-          <p
-            className="relative text-xs font-semibold uppercase text-[var(--color-muted)]"
-            style={{ letterSpacing: "0.1em" }}
-          >
-            {me ? "Where you rank" : "Who watched the most"}
-          </p>
-          <motion.p
-            className="slide-hero relative mt-4 font-black tabular-nums text-[var(--color-text)]"
-            initial={reduce ? false : { opacity: 0, scale: 0.92 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.6, ease: EASE_OUT_EXPO }}
-          >
-            {me ? (
-              <>
-                #{me.rank}
-                <span className="slide-hero-unit text-[var(--color-text-secondary)]"> of {ranked.length}</span>
-              </>
-            ) : (
-              leader.value.toLocaleString()
-            )}
-          </motion.p>
-          {!me && (
-            <p className="text-title relative mt-3 text-[var(--color-text-secondary)]">
-              {unitLabel(metric, leader.value)} for {leader.member.nickname}
+        {/* The h1 comes first in the DOM so headings and screen readers start with the verdict;
+            visually the kicker and hero still sit above it (flex order), so the headline never
+            spoils the number for sighted viewers */}
+        <div className="flex flex-col">
+          <h1 id="h2h-heading" className="text-headline order-2 mt-6 font-bold" style={{ textWrap: "balance" }}>
+            {headline}
+          </h1>
+          <div className="relative order-1 flex flex-col items-center py-6 text-center">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-[-1rem] inset-y-[-2rem]"
+              style={{ background: "var(--glow-hero)" }}
+            />
+            <p className="relative text-sm font-medium text-[var(--color-text-secondary)]">
+              {me ? "Where you rank" : "Who watched the most"}
             </p>
-          )}
+            <motion.p
+              className="slide-hero relative mt-4 font-black tabular-nums text-[var(--color-text)]"
+              initial={reduce ? false : { opacity: 0, scale: 0.92 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.6, ease: EASE_OUT_EXPO }}
+            >
+              {me ? (
+                <>
+                  #{me.rank}
+                  <span className="slide-hero-unit text-[var(--color-text-secondary)]"> of {ranked.length}</span>
+                </>
+              ) : (
+                leader.value.toLocaleString()
+              )}
+            </motion.p>
+            {!me && (
+              <p className="text-title relative mt-3 text-[var(--color-text-secondary)]">
+                {unitLabel(metric, leader.value)} for {leader.member.nickname}
+              </p>
+            )}
+          </div>
         </div>
-
-        <h1 id="h2h-heading" className="text-headline mt-6 font-bold" style={{ textWrap: "balance" }}>
-          {headline}
-        </h1>
         <p className="text-title mt-3 text-[var(--color-text-secondary)]">{punchline}</p>
 
         <div className="mt-8 flex flex-col gap-3">
           {ownerOffBoard && (
             <Link href={`${groupHref}?add=1`} className="btn-primary w-full px-6 py-3">
-              Add my reel
+              {JOIN_ACTIONS.addReel}
               <ArrowRightIcon />
             </Link>
           )}
           {/* Otherwise the page's one red action: the standings are made to be screenshotted */}
           <CompareShare group={group} comparison={comparison} ownedByMe={ownedByMe} primary={!ownerOffBoard} />
+          <p className="-mt-2 text-sm text-[var(--color-text-secondary)]">
+            Sends the head-to-head card with your invite code on it, so whoever sees it can join.
+          </p>
         </div>
       </section>
 
@@ -145,7 +149,7 @@ export default function CompareView({
           Invite more
         </h2>
         <p className="mt-1 mb-4 text-sm text-[var(--color-text-secondary)]">
-          More people, more roasts. They join with the link or the code.
+          More people, more roasts. &ldquo;Share the invite&rdquo; sends just the link and the code.
         </p>
         <InviteActions code={group.invite_code} groupName={group.name} ownedByMe={ownedByMe} />
       </section>

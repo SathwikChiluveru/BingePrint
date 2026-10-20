@@ -14,16 +14,6 @@ const EASE_SPRING = [0.34, 1.56, 0.64, 1] as const;
 
 const kickerStyle = { letterSpacing: "0.1em", color: "var(--color-muted)" } as const;
 
-/** "~" is read aloud as "tilde"; screen readers get "about" instead. */
-function Approx() {
-  return (
-    <>
-      <span aria-hidden="true">~</span>
-      <span className="sr-only">about </span>
-    </>
-  );
-}
-
 /** Builds the roast from the record day itself: its date plus how many titles or hours it held. */
 function bingeQuip(opts: {
   date: Date | null;
@@ -44,7 +34,8 @@ function bingeQuip(opts: {
     // pretending every title was a choice (the product is named after it).
     if (titleCount >= 12) return `${day}Autoplay did some of that. You never once reached for the remote.`;
     if (titleCount >= 6 && oneMore) return `${day}${oneMore}`;
-    return `${day}${titleCount.toLocaleString()} ${titleCount === 1 ? "title" : "titles"}. By binge standards, a light snack.`;
+    // The hero already states the count; the quip never repeats it.
+    return `${day}By binge standards, a light snack.`;
   }
   if (hours >= 8) return `${day}${wholeHours.toLocaleString()} hours and the remote never left your hand.`;
   if (hours >= 5) return `${day}${oneMore ?? "Five-plus hours on one title. Did you fall asleep on the couch?"}`;
@@ -67,15 +58,6 @@ export function Slide5BingeBeast({ stats }: Props) {
   // startTime is a string once stats round-trip through localStorage or the API.
   const date = toValidDate(longestBinge?.startTime);
 
-  // Date-only: lead with the exact count, hours are a secondary estimate.
-  // A single calendar day cannot hold more than 24h, so drop the estimate if it overshoots.
-  const estimateLine =
-    estimated && hours <= 24 ? (
-      <>
-        <Approx />
-        {hours > 0 ? `${hours.toLocaleString()}h` : `${totalMins.toLocaleString()}m`} of watching
-      </>
-    ) : null;
 
   // Units step down (.slide-hero-unit) so "10h 45m" fits a 320px screen at hero size.
   const hero = estimated ? (
@@ -96,15 +78,20 @@ export function Slide5BingeBeast({ stats }: Props) {
   const heroAria = estimated
     ? undefined
     : `${wholeHours.toLocaleString()} ${wholeHours === 1 ? "hour" : "hours"}${mins > 0 ? ` ${mins} ${mins === 1 ? "minute" : "minutes"}` : ""}`;
-  // Date-only data has no sittings, so a "binge" is one calendar day (defined in a visible note under the label).
+  // Date-only data has no sittings, so a "binge" is one calendar day (defined in the footnote).
   const heroLabel = estimated ? `${titleCount === 1 ? "title" : "titles"} in one day` : "straight";
 
   const quip = bingeQuip({ date, estimated, titleCount, hours, wholeHours });
-  // One muted footnote: what was on, and nothing else.
-  const footnote =
+  // One muted footnote: what was on. Date-only files lead it with what a binge means there, so the
+  // slide stays at five text elements (kicker, hero, label, quip, footnote). The estimated hours are
+  // dropped there: the exact count is the hero, and a second hedged number would only restate it.
+  const watching =
     titles.length > 0
-      ? `Watching ${titles.slice(0, 2).join(", ")}${titles.length > 2 ? ` +${(titles.length - 2).toLocaleString()} more` : ""}`
+      ? `Watching ${titles.slice(0, 2).join(", ")}${titles.length > 2 ? ` +${(titles.length - 2).toLocaleString()} more` : ""}.`
       : "";
+  const footnote = estimated
+    ? `Your file has dates only, so a binge counts one calendar day.${watching ? ` ${watching}` : ""}`
+    : watching.replace(/\.$/, "");
 
   return (
     <div className="slide-container slide-stack items-center px-6">
@@ -147,24 +134,6 @@ export function Slide5BingeBeast({ stats }: Props) {
             >
               {heroLabel}
             </motion.p>
-
-            {(estimateLine || estimated) && (
-              <motion.p
-                className="text-sm mt-1 max-w-sm"
-                style={{ color: "var(--color-muted)" }}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.5, duration: 0.4, ease: EASE_SMOOTH }}
-              >
-                {estimateLine}
-                {/* Date-only data has no sittings, so the definition is shown, not hidden. */}
-                {estimated && (
-                  <span className="block text-xs mt-0.5">
-                    Your file has dates only, so a binge counts one calendar day.
-                  </span>
-                )}
-              </motion.p>
-            )}
 
             <motion.p
               className="mt-8 short:mt-5 text-title font-semibold max-w-sm"

@@ -137,6 +137,53 @@ describe("SlideShow", () => {
     expect(screen.getByText("Film Night is waiting at the end.")).toBeInTheDocument();
   });
 
+  it("an invitee can skip straight to their group (the card), even on a first watch", async () => {
+    localStorage.clear();
+    const stats = statsFrom(timedCsv());
+    useAutoplayedStore.setState({
+      wrappedStats: stats,
+      sessionId: SESSION,
+      myGroup: null,
+      pendingInvite: { code: "abcd1234ef", groupName: "Film Night", savedAt: Date.now() },
+    });
+    renderCalm(<SlideShow stats={stats} sessionId={SESSION} />);
+    expect(screen.queryByRole("button", { name: "Skip to my card" })).toBeNull();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Skip to Film Night" }));
+    });
+    expect(live()).toMatch(/^Your card, slide (\d+) of \1$/);
+  });
+
+  it("an invite without a group name skips to 'your group'", () => {
+    const stats = statsFrom(timedCsv());
+    useAutoplayedStore.setState({
+      wrappedStats: stats,
+      sessionId: SESSION,
+      myGroup: null,
+      pendingInvite: { code: "abcd1234ef", savedAt: Date.now() },
+    });
+    renderCalm(<SlideShow stats={stats} sessionId={SESSION} />);
+    expect(screen.getByRole("button", { name: "Skip to your group" })).toBeInTheDocument();
+  });
+
+  it("the last slide has a Home link beside Back, since the X is hidden there on phones", () => {
+    sessionStorage.setItem(`autoplayed:slide:${SESSION}`, "99");
+    show(statsFrom(timedCsv()));
+    expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/");
+    expect(screen.getAllByRole("button", { name: "Previous slide" }).length).toBeGreaterThan(0);
+  });
+
+  it("slide 4 with 5 or fewer different titles leads with the count, not 100%", () => {
+    const stats = statsFrom(dateOnlyCsv());
+    expect(stats.uniqueShowsCount).toBeLessThanOrEqual(5);
+    sessionStorage.setItem(`autoplayed:slide:${SESSION}`, "3");
+    show(stats);
+    const phrase = stats.uniqueShowsCount === 1 ? "1 show or movie" : `${stats.uniqueShowsCount} different shows and movies`;
+    expect(live()).toBe(`Top five: ${phrase}, slide 4 of ${dotTitles().length}`);
+    expect(screen.queryByText("%")).toBeNull();
+    expect(screen.getByText("Not much of a contest.")).toBeInTheDocument();
+  });
+
   it("ignores a garbage stored slide", () => {
     sessionStorage.setItem(`autoplayed:slide:${SESSION}`, "-3");
     show(statsFrom(timedCsv()));

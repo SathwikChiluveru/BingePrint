@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
-import { ExternalIcon, FileIcon, LockIcon } from "./icons";
+import Link from "next/link";
+import { ExternalIcon } from "./icons";
+import { LandingDropZone } from "./LandingDropZone";
 
 type Step = {
   title: string;
@@ -33,62 +35,46 @@ function ExportArtifact() {
   );
 }
 
-function FileArtifact() {
-  return (
-    <div
-      className="w-full rounded-[12px] p-4"
-      style={{ background: "var(--color-surface-2)", border: "1px dashed var(--color-border-strong)" }}
-    >
-      <div className="flex items-center gap-3">
-        <span style={{ color: "var(--color-text-secondary)" }}>
-          <FileIcon size={22} />
-        </span>
-        <span className="min-w-0 truncate text-sm" style={{ ...mono, color: "var(--color-text)" }}>
-          NetflixViewingHistory.csv
-        </span>
-      </div>
-      <div
-        className="mt-3 flex items-center gap-2 border-t pt-3 text-sm font-semibold"
-        style={{ borderColor: "var(--color-border)", color: "var(--color-success)" }}
-      >
-        <LockIcon size={16} />
-        Read on this device. Never uploaded.
-      </div>
-    </div>
-  );
-}
-
 function ReelArtifact() {
-  // Shows what the hero reel does not: an estimated stat with its "~" marker, and the personality frame
+  // Frames the hero reel never shows: estimated watch time (with its "~") and the busiest weekday.
+  // True 9:16 sample frames at the sample-slide radius; one faint glow sits behind the active frame only.
   const frames = [
-    { label: "Watch time", value: "~4,046h", kind: "number" },
-    { label: "Personality", value: "Binge Lord", kind: "word" },
+    { label: "Watch time", value: "~4,046h", kind: "number", active: true },
+    { label: "Your week", value: "Sundays", kind: "word", active: false },
   ];
   return (
     <div className="w-full">
-      <div className="flex items-end justify-center gap-3" aria-hidden="true">
-        {frames.map((f, i) => (
-          <div
-            key={f.label}
-            className="flex aspect-[9/16] w-[40%] max-w-28 flex-col items-center justify-center rounded-[12px] px-2 text-center"
-            style={{
-              background: "var(--color-surface-2)",
-              border: "1px solid var(--color-border)",
-              transform: i === 1 ? "translateY(-10px)" : undefined,
-            }}
-          >
-            <span
-              className="text-xs font-semibold uppercase"
-              style={{ color: "var(--color-muted)", letterSpacing: "0.1em" }}
+      <div className="flex items-center justify-center gap-3" aria-hidden="true">
+        {frames.map((f) => (
+          <div key={f.label} className="relative isolate w-[46%] max-w-[7.5rem]">
+            {f.active && (
+              <div
+                className="pointer-events-none absolute inset-[-45%] -z-10 opacity-70"
+                style={{ background: "var(--glow-hero)" }}
+              />
+            )}
+            <div
+              className="flex aspect-[9/16] w-full flex-col items-center justify-center rounded-[24px] px-2 text-center"
+              style={{
+                background: f.active ? "var(--color-bg)" : "var(--color-surface)",
+                border: `1px solid ${f.active ? "var(--color-border-strong)" : "var(--color-border)"}`,
+                opacity: f.active ? 1 : 0.7,
+                transform: f.active ? undefined : "scale(0.9)",
+              }}
             >
-              {f.label}
-            </span>
-            <span
-              className={`mt-1 font-black ${f.kind === "number" ? "text-xl tabular-nums" : "text-lg leading-tight"}`}
-              style={{ letterSpacing: "-0.03em" }}
-            >
-              {f.value}
-            </span>
+              <span
+                className="text-xs font-semibold uppercase"
+                style={{ color: "var(--color-muted)", letterSpacing: "0.1em" }}
+              >
+                {f.label}
+              </span>
+              <span
+                className={`mt-1 font-black ${f.kind === "number" ? "text-xl tabular-nums" : "text-lg leading-tight"}`}
+                style={{ letterSpacing: "-0.03em" }}
+              >
+                {f.value}
+              </span>
+            </div>
           </div>
         ))}
       </div>
@@ -98,6 +84,7 @@ function ReelArtifact() {
     </div>
   );
 }
+
 
 function InviteArtifact() {
   // One mono chip reads as a code to share; per-character boxes would read as an input to fill in
@@ -136,11 +123,14 @@ const steps: Step[] = [
     title: "Add the file",
     body: (
       <>
-        It&apos;s read on your device. Only the computed stats are kept, and they reach our server only if you join
-        a group.
+        Add it right here. It&apos;s read on your device; only the computed stats are kept, and they
+        reach our server only if you join a group.{" "}
+        <Link href="/privacy" className="underline underline-offset-4 hover:text-white" style={{ color: "var(--color-text)" }}>
+          What&apos;s kept, exactly
+        </Link>
       </>
     ),
-    artifact: <FileArtifact />,
+    artifact: <LandingDropZone />,
   },
   {
     title: "Sit through your reel",
@@ -157,7 +147,7 @@ const steps: Step[] = [
     body: (
       <>
         Start a group and drop the code in the chat. Everyone&apos;s stats land side by side. Groups need a quick
-        sign-in and share your stats, never your file.
+        sign-in. The group sees your name, stats and personality, never the file.
       </>
     ),
     artifact: <InviteArtifact />,

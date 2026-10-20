@@ -15,6 +15,8 @@ const stats = { personality: "The Night Owl" } as unknown as WrappedStats;
 
 beforeEach(() => {
   localStorage.clear();
+  // adoptJoinParam looks the code up in the background; offline unless a test says otherwise
+  vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new TypeError("offline"))));
 });
 
 describe("isPendingInviteFresh", () => {
@@ -170,5 +172,76 @@ describe("persistence and legacy key migration", () => {
     const { useAutoplayedStore } = await loadStore();
     expect(localStorage.getItem("binge-print-session")).toBeNull();
     expect(useAutoplayedStore.getState().sessionId).toBe("current1");
+  });
+});
+
+describe("adoptJoinParam lookup enrichment", () => {
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+
+  it("fills the group name and id from the public lookup, once per code", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ id: "g1", name: "Crew", preview: true })));
+    vi.stubGlobal("fetch", fetchMock);
+    const { adoptJoinParam, useAutoplayedStore } = await loadStore();
+    adoptJoinParam("abcd1234");
+    await flush();
+    expect(useAutoplayedStore.getState().pendingInvite).toMatchObject({ code: "abcd1234", groupName: "Crew", groupId: "g1" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect((fetchMock.mock.calls[0] as unknown as [string])[0]).toBe("/api/groups/lookup?code=abcd1234");
+    adoptJoinParam("abcd1234");
+    await flush();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("enriches a fresh saved invite that has no name yet", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ id: "g1", name: "Crew" })));
+    vi.stubGlobal("fetch", fetchMock);
+    const { adoptJoinParam, useAutoplayedStore } = await loadStore();
+    useAutoplayedStore.getState().setPendingInvite({ code: "abcd1234" });
+    adoptJoinParam("abcd1234");
+    await flush();
+    expect(useAutoplayedStore.getState().pendingInvite?.groupName).toBe("Crew");
+  });
+
+  it("skips the lookup when the saved invite already has a name and id", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { adoptJoinParam, useAutoplayedStore } = await loadStore();
+    useAutoplayedStore.getState().setPendingInvite({ code: "abcd1234", groupName: "Crew", groupId: "g1" });
+    adoptJoinParam("abcd1234");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps the bare code on a failed lookup and never throws", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 404 })));
+    const { adoptJoinParam, useAutoplayedStore } = await loadStore();
+    expect(adoptJoinParam("abcd1234")).toBe("abcd1234");
+    await flush();
+    expect(useAutoplayedStore.getState().pendingInvite).not.toHaveProperty("groupName");
+  });
+
+  it("never overwrites a newer invite for a different code", async () => {
+    let resolve!: (r: Response) => void;
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>((r) => (resolve = r))));
+    const { adoptJoinParam, useAutoplayedStore } = await loadStore();
+    adoptJoinParam("abcd1234");
+    useAutoplayedStore.getState().setPendingInvite({ code: "zzzz9999" });
+    resolve(new Response(JSON.stringify({ id: "g1", name: "Crew" })));
+    await flush();
+    expect(useAutoplayedStore.getState().pendingInvite).toMatchObject({ code: "zzzz9999" });
+    expect(useAutoplayedStore.getState().pendingInvite).not.toHaveProperty("groupName");
+  });
+});
+
+describe("forgetMyGroup", () => {
+  it("clears the stored group (and its pending invite) only when it is that group", async () => {
+    const { forgetMyGroup, useAutoplayedStore } = await loadStore();
+    const s = useAutoplayedStore.getState();
+    s.setMyGroup({ id: "g1", inviteCode: "abcd1234", name: "Crew" });
+    s.setPendingInvite({ code: "abcd1234", groupId: "g1" });
+    expect(forgetMyGroup("g2")).toBe(false);
+    expect(useAutoplayedStore.getState().myGroup?.id).toBe("g1");
+    expect(forgetMyGroup("g1")).toBe(true);
+    expect(useAutoplayedStore.getState().myGroup).toBeNull();
+    expect(useAutoplayedStore.getState().pendingInvite).toBeNull();
   });
 });

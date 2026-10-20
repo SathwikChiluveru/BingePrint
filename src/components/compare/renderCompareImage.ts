@@ -1,4 +1,5 @@
 import { safeInviteCode } from "@/lib/share/safety";
+import { inviteLabel } from "@/lib/share/renderShareImage";
 
 /**
  * Head-to-head share card for the compare page: 1080x1920 PNG drawn on a canvas, system fonts only.
@@ -33,6 +34,8 @@ const MONO_STACK = 'ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, m
 
 const COLOR_BG = "#141414";
 const COLOR_SURFACE = "#1a1a1a";
+// Seat Row Raised (--color-surface-2): the invite code chip, same as the reel's card
+const COLOR_SURFACE_2 = "#242424";
 const COLOR_TEXT = "#ffffff";
 const COLOR_SECONDARY = "#b3b3b3";
 const COLOR_MUTED = "#8c8c8c";
@@ -44,8 +47,34 @@ function font(weight: number, size: number, stack = FONT_STACK) {
   return `${weight} ${size}px ${stack}`;
 }
 
-function setTracking(ctx: Ctx, px: number) {
-  if ("letterSpacing" in ctx) ctx.letterSpacing = `${px}px`;
+/** Returns false when the canvas has no native letterSpacing (callers then space glyphs by hand). */
+function setTracking(ctx: Ctx, px: number): boolean {
+  if (!("letterSpacing" in ctx)) return false;
+  ctx.letterSpacing = `${px}px`;
+  return true;
+}
+
+/** Centered, tracked text; falls back to per-glyph drawing without native letterSpacing. */
+function drawTracked(ctx: Ctx, text: string, x: number, y: number, trackingPx: number) {
+  const align = ctx.textAlign;
+  if (setTracking(ctx, trackingPx)) {
+    // Native letterSpacing adds trailing space after the last glyph; offset half of it.
+    ctx.textAlign = "center";
+    ctx.fillText(text, x + trackingPx / 2, y);
+    setTracking(ctx, 0);
+    ctx.textAlign = align;
+    return;
+  }
+  const glyphs = Array.from(text);
+  const widths = glyphs.map((g) => ctx.measureText(g).width);
+  const total = widths.reduce((a, b) => a + b, 0) + trackingPx * (glyphs.length - 1);
+  let cursor = x - total / 2;
+  ctx.textAlign = "left";
+  glyphs.forEach((g, i) => {
+    ctx.fillText(g, cursor, y);
+    cursor += widths[i] + trackingPx;
+  });
+  ctx.textAlign = align;
 }
 
 /** Greedy word wrap; a single word wider than maxWidth is broken by character. */
@@ -265,19 +294,42 @@ export async function renderCompareImage(input: CompareImageInput): Promise<Blob
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    drawLabel(ctx, input.ownedByMe ? "Join my group" : "Join our group", cx, inviteTop + 84);
+    // Same label as the reel's card ("Join {group}" when the name fits, else my/our group)
+    drawLabel(ctx, inviteLabel(input.ownedByMe, input.groupName), cx, inviteTop + 84, CONTENT_W - 96);
 
-    let codeSize = 120;
-    ctx.font = font(700, codeSize, MONO_STACK);
-    setTracking(ctx, codeSize * 0.18);
-    while (ctx.measureText(code).width > CONTENT_W - 96 && codeSize > 56) {
+    // The code as one mono chip (DESIGN.md "Displayed codes": Seat Row Raised, Hairline border,
+    // 0.2em tracking, weight 600), matching renderShareImage
+    const CHIP_PAD_X = 48;
+    let codeSize = 92;
+    const tracking = () => codeSize * 0.2;
+    const codeWidth = () => {
+      ctx.font = font(600, codeSize, MONO_STACK);
+      const native = setTracking(ctx, tracking());
+      const w = native
+        ? ctx.measureText(code).width - tracking()
+        : ctx.measureText(code).width + tracking() * (code.length - 1);
+      setTracking(ctx, 0);
+      return w;
+    };
+    let textW = codeWidth();
+    while (textW + CHIP_PAD_X * 2 > CONTENT_W - 96 && codeSize > 48) {
       codeSize -= 4;
-      ctx.font = font(700, codeSize, MONO_STACK);
-      setTracking(ctx, codeSize * 0.18);
+      textW = codeWidth();
     }
+    const chipH = Math.round(codeSize * 1.45);
+    const chipW = textW + CHIP_PAD_X * 2;
+    const chipTop = inviteTop + 116;
+    ctx.fillStyle = COLOR_SURFACE_2;
+    ctx.beginPath();
+    if (typeof ctx.roundRect === "function") ctx.roundRect(cx - chipW / 2, chipTop, chipW, chipH, 18);
+    else ctx.rect(cx - chipW / 2, chipTop, chipW, chipH);
+    ctx.fill();
+    ctx.strokeStyle = COLOR_BORDER;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.font = font(600, codeSize, MONO_STACK);
     ctx.fillStyle = COLOR_TEXT;
-    ctx.fillText(code, cx + codeSize * 0.09, inviteTop + 124 + codeSize * 0.8);
-    setTracking(ctx, 0);
+    drawTracked(ctx, code, cx, chipTop + chipH / 2 + codeSize * 0.36, tracking());
 
     ctx.font = font(500, 34);
     ctx.fillStyle = COLOR_SECONDARY;

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { NextRequest } from "next/server";
-import type { OwnerTeaser } from "@/lib/supabase/groups";
+import { teaserNickname, type OwnerTeaser } from "@/lib/supabase/groups";
 
 // Raw request cap. Clients still send full WrappedStats (incl. allBingeSessions, which can run to
 // a few hundred KB for long histories), so the cap is generous; what gets stored is the summary.
@@ -26,7 +26,7 @@ const PERSONALITIES = [
   "The Night Owl",
   "The Weekend Warrior",
   "The Loyalist",
-  "The Genre Surfer",
+  "The Channel Surfer",
   "The Casual Viewer",
 ] as const;
 
@@ -60,7 +60,11 @@ const WrappedSummarySchema = z.object({
   dayHeatmap: z.array(z.object({ day: z.enum(DAYS), hours: count })).max(7),
   // Titles started per weekday: exact even for date-only exports, so groups can compare them
   dayTitleCounts: z.array(z.object({ day: z.enum(DAYS), count })).max(7).optional(),
-  personality: z.enum(PERSONALITIES),
+  // "The Genre Surfer" was renamed "The Channel Surfer"; older clients and stored reels still send
+  // the old label, so it is accepted and stored under the new one
+  personality: z
+    .union([z.enum(PERSONALITIES), z.literal("The Genre Surfer")])
+    .transform((p) => (p === "The Genre Surfer" ? "The Channel Surfer" : p)),
   personalityDescription: text(400),
   funComparison: text(400),
   peakHour: z.number().int().min(0).max(23),
@@ -102,10 +106,17 @@ export async function readJson(request: NextRequest): Promise<ReadJsonResult> {
 }
 
 /**
- * Personality + one headline stat, derived from the validated summary (never from client text).
- * Date-only exports lead with the exact title count; their hours are an estimate, so they trail.
+ * Personality + one headline stat, derived from the validated summary (never from client text),
+ * plus the owner's nickname when they picked one (zod-validated, 1 to 30 chars; the "Me"
+ * placeholder is dropped). Date-only exports lead with the exact title count; their hours are an
+ * estimate, so they trail.
  */
-export function buildOwnerTeaser(s: WrappedSummary): OwnerTeaser {
+export function buildOwnerTeaser(s: WrappedSummary, nickname?: string | null): OwnerTeaser {
+  const name = teaserNickname(nickname);
+  return { ...teaserStats(s), ...(name ? { nickname: name } : {}) };
+}
+
+function teaserStats(s: WrappedSummary): OwnerTeaser {
   const hours = Math.round(s.totalHours).toLocaleString("en-US");
   // Only an explicit true means real watch times; older summaries without the flag are date-only
   if (s.hasTimeData !== true) {

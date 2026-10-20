@@ -17,7 +17,7 @@ vi.mock("@/lib/rate-limit", () => ({
 }));
 
 import { POST as join } from "@/app/api/groups/[groupId]/members/route";
-import { PUT as update } from "@/app/api/groups/[groupId]/members/me/route";
+import { DELETE as leave, PUT as update } from "@/app/api/groups/[groupId]/members/me/route";
 
 function setup(opts: FakeOptions) {
   h.fake = createFakeSupabase(opts);
@@ -212,5 +212,114 @@ describe("PUT /api/groups/[groupId]/members/me (update my stats)", () => {
     expect((await updateReq()).status).toBe(429);
     h.limited = ["update-ip:"];
     expect((await updateReq()).status).toBe(429);
+  });
+});
+
+describe("PUT /api/groups/[groupId]/members/me (nickname)", () => {
+  const rowQuery = (c: { op: string; payload?: unknown }) =>
+    c.op === "select"
+      ? { data: CURRENT, error: null }
+      : { data: { ...CURRENT, ...(c.payload as object) }, error: null };
+
+  it("updates only the nickname when sent on its own, and answers { member }", async () => {
+    const fake = setup({ user: USER, query: rowQuery });
+    const res = await updateReq({ nickname: "  Sammy " });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.member).toMatchObject({ id: "m1", nickname: "Sammy" });
+    const upd = fake.calls.find((c) => c.op === "update");
+    expect(upd?.payload).toEqual({ nickname: "Sammy" });
+  });
+
+  it("updates nickname and stats together", async () => {
+    const fake = setup({ user: USER, query: rowQuery });
+    const res = await updateReq({ nickname: "Sam", wrappedData: wirePayload() });
+    expect(res.status).toBe(200);
+    const upd = fake.calls.find((c) => c.op === "update");
+    expect(Object.keys(upd?.payload as object).sort()).toEqual(["nickname", "wrapped_data"]);
+  });
+
+  it("answers { member } for a stats-only update too", async () => {
+    setup({ user: USER, query: rowQuery });
+    const body = await (await updateReq()).json();
+    expect(body.member).toMatchObject({ id: "m1" });
+  });
+
+  it("422 on an empty body, a blank nickname or one over 30 characters", async () => {
+    const fake = setup({ user: USER });
+    expect((await updateReq({})).status).toBe(422);
+    expect((await updateReq({ nickname: "   " })).status).toBe(422);
+    expect((await updateReq({ nickname: "n".repeat(31) })).status).toBe(422);
+    expect(fake.calls).toHaveLength(0);
+  });
+
+  it("fallback without migration 004 rejoins with the new nickname and the old stats", async () => {
+    const fake = setup({
+      user: USER,
+      query: (c) => {
+        if (c.table === "members" && c.op === "select") return { data: CURRENT, error: null };
+        if (c.table === "members" && c.op === "update") return { data: null, error: null };
+        if (c.table === "groups") return { data: { invite_code: INVITE_CODE }, error: null };
+        return { data: null, error: null };
+      },
+      rpc: (_fn, args) => ({ data: [{ ...CURRENT, nickname: args.p_nickname }], error: null }),
+    });
+    const res = await updateReq({ nickname: "Sammy" });
+    expect(res.status).toBe(200);
+    expect((await res.json()).member.nickname).toBe("Sammy");
+    expect(fake.rpcCalls).toHaveLength(1);
+    expect(fake.rpcCalls[0].args).toMatchObject({ p_nickname: "Sammy", p_wrapped_data: { old: true } });
+  });
+});
+
+const leaveReq = (groupId = GROUP_ID) =>
+  leave(req(`/api/groups/${groupId}/members/me`, { method: "DELETE" }), params({ groupId }));
+
+describe("DELETE /api/groups/[groupId]/members/me (leave)", () => {
+  it("401 when signed out, without touching members", async () => {
+    const fake = setup({ user: null });
+    expect((await leaveReq()).status).toBe(401);
+    expect(fake.calls).toHaveLength(0);
+  });
+
+  it("404 for a non-UUID group id before any client is made", async () => {
+    const fake = setup({ user: USER });
+    expect((await leaveReq("nope")).status).toBe(404);
+    expect(fake.client.auth.getUser).not.toHaveBeenCalled();
+  });
+
+  it("deletes only the caller's own row and answers { left: true }", async () => {
+    const fake = setup({ user: USER, query: () => ({ data: [{ id: "m1" }], error: null }) });
+    const res = await leaveReq();
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ left: true });
+    const del = fake.calls.find((c) => c.op === "delete");
+    expect(del?.table).toBe("members");
+    expect(del?.filters).toEqual([
+      ["group_id", GROUP_ID],
+      ["user_id", USER.id],
+    ]);
+  });
+
+  it("404 when the caller has no row in the group", async () => {
+    setup({ user: USER, query: () => ({ data: [], error: null }) });
+    expect((await leaveReq()).status).toBe(404);
+  });
+
+  it("500 on a delete error", async () => {
+    setup({ user: USER, query: () => ({ data: null, error: { code: "XX000", message: "boom" } }) });
+    expect((await leaveReq()).status).toBe(500);
+  });
+
+  it("429 per IP before auth, and per user after", async () => {
+    let fake = setup({ user: USER });
+    h.limited = ["leave-ip:"];
+    expect((await leaveReq()).status).toBe(429);
+    expect(fake.client.auth.getUser).not.toHaveBeenCalled();
+
+    fake = setup({ user: USER });
+    h.limited = ["leave-user:"];
+    expect((await leaveReq()).status).toBe(429);
+    expect(fake.calls).toHaveLength(0);
   });
 });

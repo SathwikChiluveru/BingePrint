@@ -160,3 +160,87 @@ describe("share/safety", () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe("teaserNickname / cleanOwnerTeaser", () => {
+  it("keeps a real name and drops blanks, the Me placeholder, over-long names and non-strings", async () => {
+    const { teaserNickname } = await import("@/lib/supabase/groups");
+    expect(teaserNickname("  Sam ")).toBe("Sam");
+    for (const v of ["", "  ", "Me", "ME", "n".repeat(31), 5, null, undefined]) expect(teaserNickname(v)).toBeNull();
+  });
+
+  it("returns only the shown fields", async () => {
+    const { cleanOwnerTeaser } = await import("@/lib/supabase/groups");
+    const base = { personality: "The Loyalist", statLabel: "of Netflix watched", statValue: "9h" };
+    expect(cleanOwnerTeaser({ ...base, nickname: "Sam", extra: 1 })).toEqual({ ...base, nickname: "Sam" });
+    expect(cleanOwnerTeaser({ ...base, nickname: "Me" })).toEqual(base);
+    expect(cleanOwnerTeaser({ personality: "x" })).toBeNull();
+  });
+});
+
+describe("group edit helpers (renameGroup, updateNickname, leaveGroup)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  function stubFetch(status: number, body: unknown) {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify(body), { status }));
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  const ID = "3f0c8a52-6b1e-4c7a-9d2e-1a2b3c4d5e6f";
+
+  it("renameGroup PATCHes a trimmed name and returns the stored one", async () => {
+    const { renameGroup } = await import("@/lib/supabase/groups");
+    const fetchMock = stubFetch(200, { id: ID, name: "Sofa Society" });
+    expect(await renameGroup(ID, "  Sofa Society ")).toEqual({ ok: true, name: "Sofa Society" });
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe(`/api/groups/${ID}`);
+    expect(init.method).toBe("PATCH");
+    expect(JSON.parse(init.body as string)).toEqual({ name: "Sofa Society" });
+  });
+
+  it.each([
+    [403, /Only the person who started/],
+    [422, /1 to 60/],
+    [429, /Wait a few minutes/],
+    [500, /old name is still there/],
+  ])("renameGroup maps %i to owned copy", async (status, message) => {
+    const { renameGroup } = await import("@/lib/supabase/groups");
+    stubFetch(status, { error: "raw server text" });
+    const result = await renameGroup(ID, "x");
+    expect(result).toMatchObject({ ok: false, status });
+    if (!result.ok) {
+      expect(result.message).toMatch(message);
+      expect(result.message).not.toContain("raw server text");
+    }
+  });
+
+  it("updateNickname PUTs only the nickname and returns the member", async () => {
+    const { updateNickname } = await import("@/lib/supabase/groups");
+    const member = { id: "m1", nickname: "Sammy" };
+    const fetchMock = stubFetch(200, { member });
+    expect(await updateNickname(ID, " Sammy ")).toEqual({ ok: true, member });
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe(`/api/groups/${ID}/members/me`);
+    expect(init.method).toBe("PUT");
+    expect(JSON.parse(init.body as string)).toEqual({ nickname: "Sammy" });
+  });
+
+  it("leaveGroup DELETEs and needs { left: true }", async () => {
+    const { leaveGroup } = await import("@/lib/supabase/groups");
+    const fetchMock = stubFetch(200, { left: true });
+    expect(await leaveGroup(ID)).toEqual({ ok: true });
+    expect((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].method).toBe("DELETE");
+    stubFetch(200, {});
+    expect(await leaveGroup(ID)).toMatchObject({ ok: false, status: 0 });
+    stubFetch(404, {});
+    expect(await leaveGroup(ID)).toMatchObject({ ok: false, status: 404, message: expect.stringMatching(/not in this group/) });
+  });
+
+  it("never throws when offline", async () => {
+    const { leaveGroup, renameGroup, updateNickname } = await import("@/lib/supabase/groups");
+    vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new TypeError("offline"))));
+    for (const r of [await leaveGroup(ID), await renameGroup(ID, "x"), await updateNickname(ID, "x")]) {
+      expect(r).toMatchObject({ ok: false, status: 0, message: expect.stringMatching(/connection/) });
+    }
+  });
+});

@@ -1,12 +1,13 @@
 "use client";
 
-import { Suspense, useEffect, useState, useSyncExternalStore } from "react";
+import { Suspense, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { MotionConfig } from "framer-motion";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { adoptJoinParam, useAutoplayedStore } from "@/lib/store";
 import { SlideShow, resetStoredSlide } from "@/components/wrapped/SlideShow";
 import { Slide10Share } from "@/components/wrapped/slides/Slide10Share";
+import { upgradeStoredStats } from "@/lib/csv/stats";
 
 const noopSubscribe = () => () => {};
 
@@ -64,7 +65,9 @@ function WrappedContent() {
       router.replace(`/wrapped/${encodeURIComponent(params.sessionId)}`, { scroll: false });
     }
   }, [autoshareInUrl, joinInUrl, params.sessionId, router]);
-  const wrappedStats = useAutoplayedStore((s) => s.wrappedStats);
+  const storedStats = useAutoplayedStore((s) => s.wrappedStats);
+  // Stats saved by an older build get the current wording (renamed personality, Casual Viewer line).
+  const wrappedStats = useMemo(() => (storedStats ? upgradeStoredStats(storedStats) : storedStats), [storedStats]);
   const sessionId = useAutoplayedStore((s) => s.sessionId);
   // A group made from an older reel is kept: slide 10 offers "Update my stats in {group}" instead of
   // forgetting it (which led to a duplicate group).

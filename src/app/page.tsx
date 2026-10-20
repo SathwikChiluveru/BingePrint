@@ -86,13 +86,8 @@ export default function LandingPage() {
 
         <GroupTeaser />
 
-        {/* Closing call: the red glow returns behind one big line and the main button */}
-        <section aria-labelledby="cta-heading" className="relative isolate overflow-hidden px-6 py-24 text-center md:py-32">
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-x-[-25%] inset-y-0 -z-10"
-            style={{ background: "var(--glow-hero)" }}
-          />
+        {/* Closing call: one big line and the main button, which is the frame's one red thing (no glow here) */}
+        <section aria-labelledby="cta-heading" className="px-6 py-24 text-center md:py-32">
           <h2 id="cta-heading" className="text-display mx-auto max-w-[14ch] font-black" style={{ textWrap: "balance" }}>
             Go on. See how bad it is.
           </h2>

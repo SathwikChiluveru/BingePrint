@@ -5,18 +5,25 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { isPendingInviteFresh, useAutoplayedStore } from "@/lib/store";
+import { forgetMyGroup, isPendingInviteFresh, useAutoplayedStore } from "@/lib/store";
 import InviteActions from "@/components/groups/InviteActions";
 import InviteFrame, { InAppInvite, NetflixFileSteps, useInAppBrowser } from "@/components/groups/InviteFrame";
+import InviteCodeChip from "@/components/groups/InviteCodeChip";
+import InlineEdit, { type SaveResult } from "@/components/groups/InlineEdit";
+import LeaveGroup from "@/components/groups/LeaveGroup";
 import { ArrowLeftIcon, ArrowRightIcon, CheckIcon } from "@/components/groups/icons";
 import { statsFingerprint, suggestNickname } from "@/components/groups/memberStats";
 import { StandingsList } from "@/components/compare/StandingRow";
-import { rankMembers } from "@/components/compare/compareModel";
+import { buildComparison, rankMembers } from "@/components/compare/compareModel";
 import type { Group, GroupMember, WrappedStats } from "@/types";
 import {
-  displayInviteCode,
+  GROUP_NAME_MAX_LENGTH,
+  NICKNAME_MAX_LENGTH,
   isValidInviteCode,
   normalizeInviteCode,
+  renameGroup,
+  teaserNickname,
+  updateNickname,
   type GroupPreview,
   type OwnerTeaser,
 } from "@/lib/supabase/groups";
@@ -51,15 +58,19 @@ const LOAD_TIMEOUT_MS = 12_000;
 
 type LoadError = "not-found" | "rate-limited" | "failed";
 
-function joinErrorMessage(status: number, body: { error?: unknown }) {
+// Group page preview of the standings: the top three (plus the viewer); compare has everyone
+const STANDINGS_PREVIEW = 3;
+
+function joinErrorMessage(status: number) {
   if (status === 401) return "Your sign-in expired. Sign in again, then add your reel.";
   if (status === 409) return "You're already in this group. Refresh to see your spot.";
   if (status === 413) return "Your stats came out too big to send. Upload your file again.";
   if (status === 429) return "Too many join attempts from this network. Wait a minute, then try again.";
   if (status === 404) return "This group no longer exists. Ask your friend for a new invite.";
   if (status === 422) return "Pick a nickname between 1 and 30 characters, then try again.";
-  if (typeof body.error === "string" && status < 500) return `${body.error}. Try again.`;
-  return "Couldn't add your reel. Try again in a moment.";
+  if (status === 400) return "That request got garbled on the way. Reload the page and try again.";
+  if (status >= 500) return "Couldn't add your reel. Try again in a moment.";
+  return "Couldn't add your reel. Reload the page and try again.";
 }
 
 function updateErrorMessage(status: number) {
@@ -142,6 +153,8 @@ function GroupDetail() {
   const [typedNickname, setTypedNickname] = useState<string | null>(null);
   const [showJoinForm, setShowJoinForm] = useState(false);
   const [error, setError] = useState("");
+  // 409: already a member, so the fix is a reload of the group, offered as a button
+  const [joinConflict, setJoinConflict] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<{ ok: boolean; text: string } | null>(null);
   // Members who joined since this device last opened the group (0 = say nothing)
@@ -152,6 +165,7 @@ function GroupDetail() {
   const pendingInvite = useAutoplayedStore((s) => s.pendingInvite);
   const setPendingInvite = useAutoplayedStore((s) => s.setPendingInvite);
   const setMyGroup = useAutoplayedStore((s) => s.setMyGroup);
+  const myGroup = useAutoplayedStore((s) => s.myGroup);
   const sessionId = useAutoplayedStore((s) => s.sessionId);
   const router = useRouter();
   const inApp = useInAppBrowser();
@@ -241,6 +255,11 @@ function GroupDetail() {
 
   const members: GroupMember[] = useMemo(() => group?.members ?? [], [group]);
   const standings = useMemo(() => rankMembers(members, user?.id ?? null), [members, user]);
+  // Two or more on the board: the page leads with the same head-to-head compare opens with
+  const comparison = useMemo(
+    () => (members.length >= 2 ? buildComparison(members, user?.id ?? null) : null),
+    [members, user]
+  );
 
   // Record what this device has now seen as a member, including the viewer's own join
   const seenAsMember = !!group && group.preview !== true && !!user && members.some((m) => m.user_id === user.id);
@@ -251,7 +270,39 @@ function GroupDetail() {
   function retryLoad() {
     setLoading(true);
     setLoadError(null);
+    setError("");
+    setJoinConflict(false);
     setAttempt((n) => n + 1);
+  }
+
+  // Owner rename: the header and the stored group shortcut pick up the new name
+  async function saveGroupName(next: string): Promise<SaveResult> {
+    const result = await renameGroup(groupId, next);
+    if (!result.ok) return { ok: false, message: result.message };
+    setGroup((prev) => (prev ? ({ ...prev, name: result.name } as LoadedGroup) : prev));
+    if (myGroup?.id === groupId) setMyGroup({ ...myGroup, name: result.name });
+    return { ok: true };
+  }
+
+  // A member's own nickname (the standings, compare and, for the owner, the invite teaser)
+  async function saveNickname(next: string): Promise<SaveResult> {
+    const result = await updateNickname(groupId, next);
+    if (!result.ok) return { ok: false, message: result.message };
+    const updated = result.member;
+    setGroup((prev) =>
+      prev
+        ? ({
+            ...prev,
+            members: (prev.members ?? []).map((m) => (m.user_id === updated.user_id ? { ...m, ...updated } : m)),
+          } as LoadedGroup)
+        : prev
+    );
+    return { ok: true };
+  }
+
+  function handleLeft() {
+    forgetMyGroup(groupId);
+    router.push("/groups");
   }
 
   async function handleJoinGroup(e: React.FormEvent) {
@@ -259,6 +310,7 @@ function GroupDetail() {
     if (!wrappedStats || !group) return;
     setJoining(true);
     setError("");
+    setJoinConflict(false);
 
     let res: Response;
     try {
@@ -275,8 +327,8 @@ function GroupDetail() {
 
     if (!res.ok) {
       setJoining(false);
-      const body = await res.json().catch(() => ({}));
-      setError(joinErrorMessage(res.status, body));
+      setJoinConflict(res.status === 409);
+      setError(joinErrorMessage(res.status));
       return;
     }
 
@@ -338,7 +390,8 @@ function GroupDetail() {
       setUpdateStatus({ ok: false, text: updateErrorMessage(res.status) });
       return;
     }
-    const updated: GroupMember | null = await res.json().catch(() => null);
+    const body: { member?: GroupMember } | null = await res.json().catch(() => null);
+    const updated = body?.member ?? null;
     setUpdating(false);
     if (updated && user) {
       setGroup((prev) =>
@@ -489,7 +542,6 @@ function GroupDetail() {
     !!codeParam || addParam || (!!invite && (invite.groupId === group.id || invite.code === group.invite_code));
   const directAdd = isPreview && !!wrappedStats && !!user && inviteMatches;
   const buttonGroupName = groupNameForButton(group.name);
-  const shownCode = displayInviteCode(group.invite_code);
   // Back to the reel on this device when there is one; signed in without one, to "Your groups"
   // on /groups; everyone else home
   const reelHref = sessionId ? `/wrapped/${encodeURIComponent(sessionId)}` : null;
@@ -510,6 +562,14 @@ function GroupDetail() {
       }}
     >
       {error}
+      {joinConflict && (
+        <>
+          {" "}
+          <button type="button" onClick={retryLoad} className="inline-flex min-h-[44px] items-center underline underline-offset-2 font-semibold">
+            Refresh
+          </button>
+        </>
+      )}
       {error.startsWith("Your sign-in expired") && (
         <>
           {" "}
@@ -667,7 +727,13 @@ function GroupDetail() {
                     .
                   </>
                 )}
-                {teaser && <> Your friend is {teaser.personality.replace(/^The\s+/, "the ")}. Think you watch less?</>}
+                {teaser && (
+                  <>
+                    {" "}
+                    {teaserNickname(teaser.nickname) ?? "Your friend"} is {teaser.personality.replace(/^The\s+/, "the ")}.
+                    Think you watch less?
+                  </>
+                )}
               </p>
             </div>
             {joinForm}
@@ -720,16 +786,12 @@ function GroupDetail() {
           Send them the link or the code. They make their reel, then land right here.
         </p>
       )}
-      <p className="mt-5 text-xs font-semibold uppercase tracking-[0.1em]" style={{ color: "var(--color-muted)" }}>
+      <p className="mt-5 text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>
         Invite code
       </p>
-      <p
-        className={`font-mono font-semibold select-all mt-1 mb-5 tracking-[0.3em] ${
-          isFresh ? "text-headline" : "text-title"
-        }`}
-      >
-        {shownCode}
-      </p>
+      <div className="mt-2 mb-5">
+        <InviteCodeChip code={group.invite_code} size={isFresh ? "lg" : "md"} />
+      </div>
       <InviteActions
         code={group.invite_code}
         groupName={group.name}
@@ -791,6 +853,19 @@ function GroupDetail() {
               {group.name}
             </h1>
           </div>
+          {/* Owner only: a quiet rename under the name (the API refuses everyone else with 403) */}
+          {isOwner && (
+            <div className="mt-2">
+              <InlineEdit
+                label="Group name"
+                value={group.name}
+                maxLength={GROUP_NAME_MAX_LENGTH}
+                editLabel="Rename group"
+                display="button-only"
+                onSave={saveGroupName}
+              />
+            </div>
+          )}
           {joinedSinceVisit > 0 && (
             <p role="status" className="mt-4 text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>
               {newSinceLastVisitLine(joinedSinceVisit)}
@@ -897,25 +972,53 @@ function GroupDetail() {
         {/* A member alone in a fresh group: getting it shared is the job, so the invite leads */}
         {inviteLeads && inviteBlock}
 
+        {/* Two or more: the head-to-head leads (same model as compare), then a short standings
+            preview. The full standings and the awards live on compare, never twice here. */}
+        {comparison && (
+          <section aria-labelledby="h2h-heading" className="mb-10">
+            {comparison.me && (
+              <p className="text-headline font-black tabular-nums" style={{ color: "var(--color-text)" }}>
+                #{comparison.me.rank}
+                <span className="text-title font-semibold" style={{ color: "var(--color-text-secondary)" }}>
+                  {" "}
+                  of {comparison.ranked.length}
+                </span>
+              </p>
+            )}
+            <h2
+              id="h2h-heading"
+              className="mt-1 text-title font-bold [overflow-wrap:anywhere]"
+              style={{ color: "var(--color-text)", textWrap: "balance" }}
+            >
+              {comparison.headline}
+            </h2>
+            <p className="mt-1" style={{ color: "var(--color-text-secondary)" }}>
+              {comparison.punchline}
+            </p>
+            <Link
+              href={`/groups/${encodeURIComponent(groupId)}/compare`}
+              className={`${primary === "compare" ? "btn-primary" : "btn-secondary"} mt-5 w-full px-6 py-3 sm:w-auto`}
+            >
+              See the full standings
+              <ArrowRightIcon />
+            </Link>
+          </section>
+        )}
+
         {/* Members as ranked roast rows (hidden from non-members: RLS returns none to them) */}
         <section aria-labelledby="members-heading">
-          <div className="flex items-center justify-between gap-4 mb-2">
-            <h2 id="members-heading" className="text-title font-semibold" style={{ color: "var(--color-text)" }}>
-              {members.length >= 2 ? "Who watches the most" : members.length === 1 ? "On the board" : "Nobody yet"}
-            </h2>
-            {members.length >= 2 && (
-              <Link
-                href={`/groups/${groupId}/compare`}
-                className={`${primary === "compare" ? "btn-primary" : "btn-secondary"} px-5 py-2`}
-              >
-                Compare
-                <ArrowRightIcon />
-              </Link>
-            )}
-          </div>
+          <h2 id="members-heading" className="mb-2 text-title font-semibold" style={{ color: "var(--color-text)" }}>
+            {members.length > STANDINGS_PREVIEW
+              ? `Top ${STANDINGS_PREVIEW} of ${members.length}`
+              : members.length >= 2
+                ? "Who watches the most"
+                : members.length === 1
+                  ? "On the board"
+                  : "Nobody yet"}
+          </h2>
 
           {members.length > 0 ? (
-            <StandingsList ranked={standings.ranked} metric={standings.metric} />
+            <StandingsList ranked={standings.ranked} metric={standings.metric} limit={STANDINGS_PREVIEW} />
           ) : (
             <p style={{ color: "var(--color-text-secondary)" }}>
               No one has added their reel yet. Add yours, then share the invite so friends can join.
@@ -926,9 +1029,37 @@ function GroupDetail() {
               Comparing unlocks when a second person joins.
             </p>
           )}
+          {members.length > STANDINGS_PREVIEW && (
+            <Link
+              href={`/groups/${encodeURIComponent(groupId)}/compare`}
+              className="mt-2 inline-flex min-h-[44px] items-center gap-2 text-sm font-semibold underline underline-offset-4"
+              style={{ color: "var(--color-text)" }}
+            >
+              Everyone, plus the awards
+              <ArrowRightIcon size={16} />
+            </Link>
+          )}
+          {/* The viewer's own name, editable in place (shown in the standings, compare and, for an
+              owner with the teaser on, the invite page) */}
+          {myMember && (
+            <div className="mt-4">
+              <InlineEdit
+                label="Your name"
+                value={myMember.nickname}
+                maxLength={NICKNAME_MAX_LENGTH}
+                editLabel="Edit your name"
+                autoComplete="nickname"
+                onSave={saveNickname}
+              />
+            </div>
+          )}
         </section>
 
         {!inviteLeads && inviteBlock}
+
+        {myMember && (
+          <LeaveGroup groupId={group.id} groupName={group.name} ownedByMe={isOwner} onLeft={handleLeft} />
+        )}
       </div>
     </main>
   );

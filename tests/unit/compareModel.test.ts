@@ -273,3 +273,21 @@ describe("listNames", () => {
     expect(listNames(names)).toBe(expected);
   });
 });
+
+describe("stored members from older builds", () => {
+  it("upgrades the old Genre Surfer label and Casual Viewer line before ranking and roasting", async () => {
+    const { upgradeMembers } = await import("@/components/compare/compareModel");
+    const old = member("Ana", { personality: "The Genre Surfer" as WrappedStats["personality"] });
+    const casual = member("Bo", {
+      personality: "The Casual Viewer",
+      personalityDescription: "1,234 titles, all-time. Netflix keeps asking.",
+    });
+    const fresh = member("Cy", {});
+    const [a, b, c] = upgradeMembers([old, casual, fresh]);
+    expect(a.wrapped_data.personality).toBe("The Channel Surfer");
+    expect(b.wrapped_data.personalityDescription).not.toMatch(/all-time/);
+    expect(c).toBe(fresh);
+    const { ranked } = rankMembers([old, fresh], null);
+    expect(ranked.find((r) => r.member.nickname === "Ana")?.roast).toMatch(/^The Channel Surfer\./);
+  });
+});

@@ -1,5 +1,8 @@
 // Invite-code and teaser helpers shared by the /groups pages and the /api/groups routes.
 
+import type { GroupMember } from "@/types";
+import { leaveGroupErrorMessage, nicknameErrorMessage, renameGroupErrorMessage } from "@/lib/copy/invite";
+
 /**
  * Invite codes are lowercase letters and digits: 8 hex chars for groups made before migration 002,
  * 10 chars from gen_invite_code() after it. Anything else is rejected before it reaches the DB.
@@ -30,11 +33,35 @@ export function displayInviteCode(code: string): string {
  */
 export const INVITE_CODE_PLACEHOLDER = "K7MQ4XHR2P";
 
-/** The owner's opt-in hook on the invite page. Built server-side from their summarised stats. */
+/**
+ * The owner's opt-in hook on the invite page. Built server-side from their summarised stats.
+ * `nickname` is the owner's name in the group ("Sam is The Binge Lord"); missing on teasers made
+ * before migration 006, or when the owner never picked a name. Kept in step with the owner's
+ * members row by the trigger in migration 006.
+ */
 export interface OwnerTeaser {
   personality: string;
   statLabel: string;
   statValue: string;
+  nickname?: string;
+}
+
+/** Longest nickname a member (and so a teaser) can carry. Matches members_nickname_length (002). */
+export const NICKNAME_MAX_LENGTH = 30;
+/** Longest group name. Matches groups_name_length (002). */
+export const GROUP_NAME_MAX_LENGTH = 60;
+
+/**
+ * The nickname to show on a teaser, or null. "Me" is the create route's placeholder when the
+ * client sends no name, so it never reads as "Me is The Binge Lord". Same rule as
+ * public.teaser_nickname() in migration 006.
+ */
+export function teaserNickname(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const name = raw.trim();
+  if (name.length < 1 || name.length > NICKNAME_MAX_LENGTH) return null;
+  if (name.toLowerCase() === "me") return null;
+  return name;
 }
 
 /** What a non-member sees of a group: no members, no wrapped data. */
@@ -52,8 +79,25 @@ export function isOwnerTeaser(value: unknown): value is OwnerTeaser {
   return (
     typeof v.personality === "string" &&
     typeof v.statLabel === "string" &&
-    typeof v.statValue === "string"
+    typeof v.statValue === "string" &&
+    (v.nickname === undefined || v.nickname === null || typeof v.nickname === "string")
   );
+}
+
+/**
+ * A stored teaser reduced to the fields the invite page may show. Drops anything else in the
+ * jsonb and any nickname that fails teaserNickname(). Null when it isn't a teaser at all.
+ */
+export function cleanOwnerTeaser(value: unknown): OwnerTeaser | null {
+  if (!isOwnerTeaser(value)) return null;
+  const nickname = teaserNickname(value.nickname);
+  return {
+    // Teasers stored before the rename may still say "The Genre Surfer"
+    personality: value.personality === "The Genre Surfer" ? "The Channel Surfer" : value.personality,
+    statLabel: value.statLabel,
+    statValue: value.statValue,
+    ...(nickname ? { nickname } : {}),
+  };
 }
 
 /** One row of GET /api/groups: a group the signed-in user owns or is a member of. */
@@ -99,4 +143,78 @@ export async function fetchMyGroups(
     clearTimeout(timer);
     signal?.removeEventListener("abort", onAbort);
   }
+}
+
+/** Result of the group-edit helpers below. `message` is owned copy, ready to show. */
+export type GroupEditResult<T extends object = object> =
+  | ({ ok: true } & T)
+  | { ok: false; status: number; message: string };
+
+export const GROUP_EDIT_TIMEOUT_MS = 10_000;
+
+/** Status 0 means the request never got an answer (offline, timeout, bad body). */
+async function send<T>(
+  url: string,
+  init: RequestInit,
+  message: (status: number) => string,
+  read: (body: unknown) => T | null
+): Promise<GroupEditResult<T & object>> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), GROUP_EDIT_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      ...init,
+      cache: "no-store",
+      signal: controller.signal,
+      headers: init.body ? { "Content-Type": "application/json" } : undefined,
+    });
+    if (!res.ok) return { ok: false, status: res.status, message: message(res.status) };
+    const body = await res.json().catch(() => null);
+    const value = read(body);
+    if (!value) return { ok: false, status: 0, message: message(0) };
+    return { ok: true, ...(value as T & object) };
+  } catch {
+    return { ok: false, status: 0, message: message(0) };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+const groupPath = (id: string) => `/api/groups/${encodeURIComponent(id)}`;
+
+/** Owner renames their group (PATCH /api/groups/[id]). Never throws. On success, `name` is the stored name. */
+export function renameGroup(id: string, name: string): Promise<GroupEditResult<{ name: string }>> {
+  return send(
+    groupPath(id),
+    { method: "PATCH", body: JSON.stringify({ name: name.trim() }) },
+    renameGroupErrorMessage,
+    (body) => {
+      const b = body as { name?: unknown } | null;
+      return b && typeof b.name === "string" ? { name: b.name } : null;
+    }
+  );
+}
+
+/** Member changes their own nickname (PUT /api/groups/[id]/members/me). Never throws. */
+export function updateNickname(id: string, nickname: string): Promise<GroupEditResult<{ member: GroupMember }>> {
+  return send(
+    `${groupPath(id)}/members/me`,
+    { method: "PUT", body: JSON.stringify({ nickname: nickname.trim() }) },
+    nicknameErrorMessage,
+    (body) => {
+      const b = body as { member?: unknown } | null;
+      return b && b.member && typeof b.member === "object" ? { member: b.member as GroupMember } : null;
+    }
+  );
+}
+
+/**
+ * Member leaves (DELETE /api/groups/[id]/members/me). Never throws. Owners can leave too; the
+ * group stays theirs. Callers should clear the stored myGroup when it is this group.
+ */
+export function leaveGroup(id: string): Promise<GroupEditResult> {
+  return send(`${groupPath(id)}/members/me`, { method: "DELETE" }, leaveGroupErrorMessage, (body) => {
+    const b = body as { left?: unknown } | null;
+    return b && b.left === true ? {} : null;
+  });
 }

@@ -72,6 +72,28 @@ describe("GET /api/groups/lookup", () => {
     expect(JSON.stringify(fake.rpcCalls)).not.toContain(CLIENT_IP);
   });
 
+  it("passes the owner nickname through and drops junk keys, blank or placeholder names", async () => {
+    const cases: Array<[unknown, Record<string, unknown>]> = [
+      [{ ...TEASER, nickname: "Sam" }, { ...TEASER, nickname: "Sam" }],
+      [{ ...TEASER, nickname: "Me" }, TEASER],
+      [{ ...TEASER, nickname: "   " }, TEASER],
+      [{ ...TEASER, nickname: "n".repeat(31) }, TEASER],
+      [{ ...TEASER, nickname: "Sam", ownerId: "leak" }, { ...TEASER, nickname: "Sam" }],
+      [{ ...TEASER, personality: "The Genre Surfer" }, { ...TEASER, personality: "The Channel Surfer" }],
+    ];
+    for (const [stored, shown] of cases) {
+      setup({ user: null, rpc: () => ({ data: [{ ...PREVIEW_ROW, owner_teaser: stored }], error: null }) });
+      const res = await lookup(req(`/api/groups/lookup?code=${INVITE_CODE}`));
+      expect((await res.json()).owner_teaser).toEqual(shown);
+    }
+  });
+
+  it("drops a teaser whose nickname is not a string", async () => {
+    setup({ user: null, rpc: () => ({ data: [{ ...PREVIEW_ROW, owner_teaser: { ...TEASER, nickname: 5 } }], error: null }) });
+    const res = await lookup(req(`/api/groups/lookup?code=${INVITE_CODE}`));
+    expect((await res.json()).owner_teaser).toBeNull();
+  });
+
   it("gives the same client the same key, and a different client a different one", async () => {
     const fake = setup({ user: null, rpc: () => ({ data: [PREVIEW_ROW], error: null }) });
     await lookup(req(`/api/groups/lookup?code=${INVITE_CODE}`));

@@ -10,11 +10,17 @@ interface Props {
   waitingGroup?: string | null;
   /** Set when this reel already reached its card once: offers a quiet jump straight there */
   onSkipToCard?: () => void;
+  /**
+   * Set with a fresh invite: the same jump to the card, labelled "Skip to {group}" (the card is where
+   * the group waits). Wins over onSkipToCard, which goes to the same place.
+   */
+  skipToGroup?: { label: string; onSkip: () => void } | null;
 }
 
 const EASE = [0.4, 0, 0.2, 1] as const;
 
-export function Slide1Intro({ waitingGroup, onSkipToCard }: Props) {
+export function Slide1Intro({ waitingGroup, onSkipToCard, skipToGroup }: Props) {
+  const skip = skipToGroup ?? (onSkipToCard ? { label: "Skip to my card", onSkip: onSkipToCard } : null);
   return (
     <div className="slide-container slide-stack items-center text-center px-6">
       <motion.p
@@ -81,17 +87,17 @@ export function Slide1Intro({ waitingGroup, onSkipToCard }: Props) {
         <span className="hidden pointer-coarse:inline">Tap or swipe to start</span>
       </motion.p>
 
-      {onSkipToCard && (
+      {skip && (
         <motion.button
           type="button"
-          onClick={onSkipToCard}
-          className="mt-2 inline-flex items-center min-h-[44px] px-3 text-sm underline-offset-4 hover:underline"
+          onClick={skip.onSkip}
+          className="mt-2 inline-flex items-center min-h-[44px] max-w-full px-3 text-sm break-words underline-offset-4 hover:underline"
           style={{ color: "var(--color-text-secondary)" }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1, duration: 0.4, ease: EASE }}
         >
-          Skip to my card
+          {skip.label}
         </motion.button>
       )}
     </div>

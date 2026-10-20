@@ -1,6 +1,7 @@
 import type { WrappedStats } from "@/types";
 import { safeInviteCode } from "./safety";
-import { EMPTY_HISTORY_LINE, isLikelyMovie } from "@/lib/csv/stats";
+import { EMPTY_HISTORY_LINE, isLikelyMovie, upgradeStoredStats } from "@/lib/csv/stats";
+import { groupNameForButton } from "@/lib/copy/invite";
 
 export type ShareImageStats = Pick<
   WrappedStats,
@@ -13,10 +14,12 @@ export type ShareImageStats = Pick<
 >;
 
 export interface ShareImageOptions {
-  /** When set, the card carries a "Join my group" / "Join our group" block with this invite code. */
+  /** When set, the card carries a "Join {group}" block with this invite code (see inviteLabel). */
   inviteCode?: string;
   /** The viewer created the group: label reads "Join my group", else "Join our group". */
   ownedByMe?: boolean;
+  /** The group's name: the label reads "Join {name}" when it fits (see inviteLabel). */
+  groupName?: string | null;
 }
 
 const WIDTH = 1080;
@@ -28,7 +31,8 @@ const FONT_STACK = '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sa
 const MONO_STACK = 'ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace';
 
 const COLOR_BG = "#141414";
-const COLOR_SURFACE = "#1a1a1a";
+// Seat Row Raised (--color-surface-2): the invite code chip
+const COLOR_SURFACE_2 = "#242424";
 const COLOR_TEXT = "#ffffff";
 const COLOR_SECONDARY = "#b3b3b3";
 const COLOR_MUTED = "#8c8c8c";
@@ -215,15 +219,21 @@ export function pickTopShowLine(stats: ShareImageStats): string | null {
   return `${count.toLocaleString()} episodes of ${title}`;
 }
 
-/** Invite panel label: "my" only when the viewer created the group. */
-export function inviteLabel(ownedByMe: boolean | undefined): string {
+/**
+ * Invite label: "Join {group name}" when the name fits a button label (24 characters), otherwise
+ * "Join my group" ("my" only when the viewer created it) or "Join our group".
+ */
+export function inviteLabel(ownedByMe: boolean | undefined, groupName?: string | null): string {
+  const name = groupNameForButton(groupName, "");
+  if (name) return `Join ${name}`;
   return ownedByMe ? "Join my group" : "Join our group";
 }
 
 export function shareRoastLine(stats: ShareImageStats): string {
   // An empty history (including stats stored before the empty-state copy) gets the empty line.
   if (num(stats.totalEpisodesEstimate) <= 0 && num(stats.totalHours) <= 0) return EMPTY_HISTORY_LINE;
-  return stats.personalityDescription?.trim() ?? "";
+  // Stats saved by an older build may carry a Casual Viewer line that repeats the total.
+  return upgradeStoredStats(stats).personalityDescription?.trim() ?? "";
 }
 
 function siteHost(): string {
@@ -290,7 +300,7 @@ export async function renderShareImage(
   const bottomZoneTop = inviteCode ? inviteTop : disclaimerY - 56 - 34;
 
   // ----- Measure the content block so it can be centered in the free space -----
-  const personality = stats.personality?.trim() || "The Casual Viewer";
+  const personality = upgradeStoredStats(stats).personality?.trim() || "The Casual Viewer";
   const roast = shareRoastLine(stats);
   const topShowLine = pickTopShowLine(stats);
   const total = pickShareTotal(stats);
@@ -416,36 +426,49 @@ export async function renderShareImage(
 
   // ----- Bottom zone -----
   if (inviteCode) {
-    const panelX = PAD_X;
-    const panelW = CONTENT_W;
-    ctx.fillStyle = COLOR_SURFACE;
+    // Label, then the code as one mono chip (DESIGN.md "Displayed codes": 6px radius on screen,
+    // Seat Row Raised, 1px Hairline, 0.2em tracking; scaled here), then the join link.
+    ctx.font = font(600, 30);
+    const label = clampLines(ctx, inviteLabel(opts.ownedByMe, opts.groupName).toUpperCase(), CONTENT_W - 64, 1)[0];
+    drawLabel(ctx, label, cx, inviteTop + 84);
+
+    const CHIP_PAD_X = 56;
+    let codeSize = 104;
+    const codeTracking = () => codeSize * 0.2;
+    const codeWidth = () => {
+      ctx.font = font(600, codeSize, MONO_STACK);
+      // Without native tracking, drawTracked spaces the characters itself: measure the same way.
+      const native = setTracking(ctx, codeTracking());
+      const w = native
+        ? ctx.measureText(inviteCode).width - codeTracking()
+        : ctx.measureText(inviteCode).width + codeTracking() * (inviteCode.length - 1);
+      setTracking(ctx, 0);
+      return w;
+    };
+    let textW = codeWidth();
+    while (textW + CHIP_PAD_X * 2 > CONTENT_W && codeSize > 56) {
+      codeSize -= 4;
+      textW = codeWidth();
+    }
+    const chipH = Math.round(codeSize * 1.45);
+    const chipW = textW + CHIP_PAD_X * 2;
+    const chipTop = inviteTop + 128;
+    ctx.fillStyle = COLOR_SURFACE_2;
     ctx.beginPath();
-    if (typeof ctx.roundRect === "function") ctx.roundRect(panelX, inviteTop, panelW, INVITE_H, 40);
-    else ctx.rect(panelX, inviteTop, panelW, INVITE_H);
+    if (typeof ctx.roundRect === "function") ctx.roundRect(cx - chipW / 2, chipTop, chipW, chipH, 18);
+    else ctx.rect(cx - chipW / 2, chipTop, chipW, chipH);
     ctx.fill();
     ctx.strokeStyle = COLOR_BORDER;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 3;
     ctx.stroke();
-
-    drawLabel(ctx, inviteLabel(opts.ownedByMe), cx, inviteTop + 84);
-
-    let codeSize = 120;
-    const codeTracking = () => codeSize * 0.18;
-    ctx.font = font(700, codeSize, MONO_STACK);
-    setTracking(ctx, codeTracking());
-    while (ctx.measureText(inviteCode).width > panelW - 96 && codeSize > 56) {
-      codeSize -= 4;
-      ctx.font = font(700, codeSize, MONO_STACK);
-      setTracking(ctx, codeTracking());
-    }
-    setTracking(ctx, 0);
+    ctx.font = font(600, codeSize, MONO_STACK);
     ctx.fillStyle = COLOR_TEXT;
-    drawTracked(ctx, inviteCode, cx, inviteTop + 84 + 40 + codeSize * 0.8, codeTracking());
+    drawTracked(ctx, inviteCode, cx, chipTop + chipH / 2 + codeSize * 0.36, codeTracking());
 
     ctx.font = font(500, 34);
     ctx.fillStyle = COLOR_SECONDARY;
-    const link = clampLines(ctx, `${host}/groups?join=${inviteCode}`, panelW - 96, 1)[0];
-    ctx.fillText(link, cx, inviteTop + INVITE_H - 64);
+    const link = clampLines(ctx, `${host}/groups?join=${inviteCode}`, CONTENT_W, 1)[0];
+    ctx.fillText(link, cx, inviteTop + INVITE_H - 40);
   } else {
     ctx.font = font(600, 34);
     ctx.fillStyle = COLOR_TEXT;

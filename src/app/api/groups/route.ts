@@ -95,7 +95,9 @@ export async function POST(request: NextRequest) {
       name: parsed.data.name,
       owner_id: user.id,
       share_teaser: shareTeaser,
-      owner_teaser: shareTeaser && wrapped ? buildOwnerTeaser(wrapped) : null,
+      // The nickname rides along so the invite page can say "Sam is The Binge Lord"; migration 006
+      // keeps it in step when the owner edits their nickname later
+      owner_teaser: shareTeaser && wrapped ? buildOwnerTeaser(wrapped, parsed.data.nickname) : null,
     })
     .select()
     .single();

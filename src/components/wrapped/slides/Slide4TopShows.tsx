@@ -41,17 +41,41 @@ export function topShowsShare(shows: ShowStat[], totalTitles: number): number {
   return Math.min(100, Math.round((watched / totalTitles) * 100));
 }
 
+type TopShowsStats = Props["stats"];
+
+/**
+ * The slide's hero. With more than 5 different shows and movies it is the top list's share of
+ * everything watched. With 5 or fewer the list is the whole history, so the share would always read
+ * "100%": the hero is the count of different shows and movies instead.
+ */
+export function topShowsHero(
+  stats: TopShowsStats
+): { kind: "share"; value: number } | { kind: "distinct"; value: number } | null {
+  const shows = (stats.topShows ?? []).slice(0, 5);
+  if (shows.length === 0) return null;
+  const unique = Math.max(Number(stats.uniqueShowsCount) || 0, shows.length);
+  if (unique <= 5) return { kind: "distinct", value: unique };
+  const estimated = stats.hasTimeData !== true;
+  // Timed exports count each title once per day (resumed sittings fold together), so the share is
+  // taken of the same unit: distinct title-days. Date-only rows already are one per title per day.
+  const units = estimated ? stats.totalEpisodesEstimate : (stats.distinctTitleDays ?? stats.totalEpisodesEstimate);
+  const share = topShowsShare(shows, units ?? 0);
+  return share > 0 ? { kind: "share", value: share } : null;
+}
+
+/** "3 different shows and movies" / "1 show or movie": a count of distinct items, never plays. */
+export function distinctTitlesPhrase(n: number): string {
+  return n === 1 ? "1 show or movie" : `${n.toLocaleString()} different shows and movies`;
+}
+
 /**
  * Sets the top list against how many different shows and movies got a try. "Titles" elsewhere in
  * the reel means plays (slide 2, the card), so this counts distinct items as "shows and movies" to
- * keep the two numbers from looking inconsistent. The list is named once ("your top 5").
+ * keep the two numbers from looking inconsistent. The list is named once ("your top 5"). When the
+ * hero already is that count, the quip does not restate it.
  */
-function topShowsQuip(n: number, uniqueTitles: number): string {
-  if (uniqueTitles <= n) {
-    return uniqueTitles === 1
-      ? "Only 1 show or movie. Not much of a contest."
-      : `Only ${uniqueTitles.toLocaleString()} different shows and movies. Not much of a contest.`;
-  }
+function topShowsQuip(uniqueTitles: number, heroIsCount: boolean): string {
+  if (heroIsCount) return "Not much of a contest.";
   return `${uniqueTitles.toLocaleString()} different shows and movies tried. The rest never stood a chance.`;
 }
 
@@ -63,10 +87,8 @@ export function Slide4TopShows({ stats }: Props) {
   // estimates), watch time otherwise. Max over the list, not just #1, in case old stats rank differently.
   const barValue = (s: ShowStat) => (estimated ? s.watchCount : s.totalSeconds) || 0;
   const max = Math.max(...shows.map(barValue), 1);
-  // Timed exports count each title once per day (resumed sittings fold together), so the share is
-  // taken of the same unit: distinct title-days. Date-only rows already are one per title per day.
-  const titleUnits = estimated ? stats.totalEpisodesEstimate : (stats.distinctTitleDays ?? stats.totalEpisodesEstimate);
-  const share = topShowsShare(shows, titleUnits ?? 0);
+  const hero = topShowsHero(stats);
+  const uniqueTitles = Math.max(Number(stats.uniqueShowsCount) || 0, shows.length);
   // MotionConfig reducedMotion="user" only drops transforms; render bars at their final
   // width outright so nothing grows under reduced motion.
   const reduce = useReducedMotion();
@@ -101,7 +123,7 @@ export function Slide4TopShows({ stats }: Props) {
               The hero is the list's grip on the whole history, not #1's episode
               count: slide 3 just showed that number.
             */}
-            {share > 0 && (
+            {hero && (
               <>
                 {/* Glow sits on the hero itself, not the slide center, since the column is left-aligned */}
                 <div className="relative">
@@ -114,8 +136,8 @@ export function Slide4TopShows({ stats }: Props) {
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.2, duration: 0.5, ease: SPRING }}
                   >
-                    {share.toLocaleString()}
-                    <span className="slide-hero-unit">%</span>
+                    {hero.value.toLocaleString()}
+                    {hero.kind === "share" && <span className="slide-hero-unit">%</span>}
                   </motion.div>
                 </div>
                 <motion.p
@@ -125,13 +147,17 @@ export function Slide4TopShows({ stats }: Props) {
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.4, duration: 0.3, ease: SMOOTH }}
                 >
-                  of everything you watched went to {shows.length === 1 ? "this one" : `your top ${shows.length}`}
+                  {hero.kind === "share"
+                    ? `of everything you watched went to ${shows.length === 1 ? "this one" : `your top ${shows.length}`}`
+                    : hero.value === 1
+                      ? "show or movie, all-time"
+                      : "different shows and movies, all-time"}
                 </motion.p>
               </>
             )}
 
             {/* Rows tighten on short screens so the roast line below lands without scrolling at 375x548 */}
-            <ol className={`w-full space-y-1.5 short:space-y-1 ${share > 0 ? "mt-5 short:mt-3" : ""}`}>
+            <ol className={`w-full space-y-1.5 short:space-y-1 ${hero ? "mt-5 short:mt-3" : ""}`}>
                 {shows.map((show, i) => {
                   const pct = Math.min(100, Math.round((barValue(show) / max) * 100));
                   return (
@@ -197,7 +223,7 @@ export function Slide4TopShows({ stats }: Props) {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 1.15, duration: 0.4, ease: SMOOTH }}
             >
-              {topShowsQuip(shows.length, stats.uniqueShowsCount ?? shows.length)}
+              {topShowsQuip(uniqueTitles, hero?.kind === "distinct")}
             </motion.p>
 
             {estimated && (

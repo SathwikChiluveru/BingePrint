@@ -37,6 +37,33 @@ export function playNoun(show: ShowStat | null | undefined, count: number): stri
 /** Shared empty-history copy, so no slide or card ever says "~0 hours". */
 export const EMPTY_HISTORY_LINE = "Nothing on record yet. Either you're brand new or that file was empty.";
 
+/** The Casual Viewer's roast. Carries no number, so the card never states the total twice. */
+export const CASUAL_VIEWER_LINE = "You press play, watch a bit, then go to bed. Nobody knows how you do it.";
+
+// Casual Viewer copy stored before CASUAL_VIEWER_LINE: "1,234 titles, all-time. Netflix keeps asking…"
+const OLD_CASUAL_VIEWER_RE = /^[\d.,\s  ]+ titles?, all-time\./;
+
+/**
+ * Brings stats saved by an older build up to the current wording: "The Genre Surfer" became
+ * "The Channel Surfer" (the export has no genre data), and the Casual Viewer line no longer
+ * repeats the total. Returns the same object when nothing changed.
+ */
+export function upgradeStoredStats<T extends { personality?: unknown; personalityDescription?: unknown }>(
+  stats: T
+): T {
+  if (!stats || typeof stats !== "object") return stats;
+  let next = stats;
+  if (stats.personality === "The Genre Surfer") next = { ...next, personality: "The Channel Surfer" };
+  if (
+    stats.personality === "The Casual Viewer" &&
+    typeof stats.personalityDescription === "string" &&
+    OLD_CASUAL_VIEWER_RE.test(stats.personalityDescription.trim())
+  ) {
+    next = { ...next, personalityDescription: CASUAL_VIEWER_LINE };
+  }
+  return next;
+}
+
 /**
  * Builds a title -> show-name function for one history.
  * Netflix writes episodes as "Show: Season 1: Episode", but movies can carry a colon too
@@ -226,17 +253,15 @@ function computePersonality(
   // Counts every distinct show; topShows is capped at 5, so it could never pass this check.
   if (uniqueShows > 40) {
     return {
-      personality: "The Genre Surfer",
+      personality: "The Channel Surfer",
       description: `${uniqueShows.toLocaleString()} different shows and movies. You contain multitudes, most of them unfinished.`,
     };
   }
   if (totalTitles <= 0) {
     return { personality: "The Casual Viewer", description: EMPTY_HISTORY_LINE };
   }
-  return {
-    personality: "The Casual Viewer",
-    description: `${totalTitles.toLocaleString()} ${totalTitles === 1 ? "title" : "titles"}, all-time. Netflix keeps asking if you're still watching.`,
-  };
+  // No count here: the card and slide 2 already state the total once.
+  return { personality: "The Casual Viewer", description: CASUAL_VIEWER_LINE };
 }
 
 // Every Academy Award Best Picture winner back to back, in hours.

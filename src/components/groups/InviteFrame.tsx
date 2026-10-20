@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { isInAppBrowser } from "@/lib/share/safety";
-import { IN_APP_OPEN_LINE, NETFLIX_FILE_STEPS, inviteUrl } from "@/lib/copy/invite";
-import { displayInviteCode, type OwnerTeaser } from "@/lib/supabase/groups";
+import { IN_APP_OPEN_LINE, NETFLIX_FILE_STEPS, inviteUrl, inviterKicker } from "@/lib/copy/invite";
+import { displayInviteCode, teaserNickname, type OwnerTeaser } from "@/lib/supabase/groups";
+import InviteCodeChip from "./InviteCodeChip";
 import { CheckIcon, CopyIcon } from "./icons";
 
 const EASE_OUT_EXPO = [0.16, 1, 0.3, 1] as const;
@@ -39,7 +40,9 @@ const heroNameStyle = {
 
 /**
  * The invite landing as a reel frame: kicker, one hero word over the glow, one roast line, then
- * the page's action. With the owner's teaser the hero is their personality; without it, the group.
+ * the page's action. With the owner's teaser the hero is their personality and the kicker names
+ * them ("Sam is" / "The Binge Lord", read as one h1), falling back to "Your friend is" when the
+ * teaser has no nickname; without a teaser, the group.
  * The hero stays white: the CTA below is the frame's one red thing.
  */
 export default function InviteFrame({
@@ -56,6 +59,8 @@ export default function InviteFrame({
   const hasArticle = /^the\s+/i.test(personality);
   const article = hasArticle ? personality.slice(0, 3) : null;
   const word = hasArticle ? personality.replace(/^the\s+/i, "") : personality;
+  const inviter = teaser ? teaserNickname(teaser.nickname) : null;
+  const kicker = teaser ? inviterKicker(inviter) : "You're invited to";
 
   return (
     <section className="relative flex flex-col items-center text-center">
@@ -65,11 +70,12 @@ export default function InviteFrame({
           className="pointer-events-none absolute left-1/2 top-1/2 block -translate-x-1/2 -translate-y-1/2"
           style={{ width: "min(110vw, 40rem)", height: "min(70vh, 30rem)", background: "var(--glow-hero)" }}
         />
+        {/* Sentence case, not a slide label: it starts the h1 ("Sam is The Binge Lord") */}
         <span
-          className="relative block text-xs font-semibold uppercase mb-6"
-          style={{ letterSpacing: "0.1em", color: "var(--color-muted)" }}
+          className="relative block text-lg font-semibold mb-4 [overflow-wrap:anywhere]"
+          style={{ color: "var(--color-text-secondary)" }}
         >
-          {teaser ? "Your friend is" : "You're invited to"}
+          {kicker}{" "}
         </span>
         {teaser && article && (
           <span className="relative block text-headline font-black mb-1" style={{ color: "var(--color-text-secondary)" }}>
@@ -99,7 +105,7 @@ export default function InviteFrame({
               <span className="tabular-nums">{teaser.statValue}</span> {teaser.statLabel}. Think you watch less?
             </p>
             <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-              They want you in <span className="font-semibold" style={{ color: "var(--color-text)" }}>{groupName}</span>.
+              {inviter ? `${inviter} wants` : "They want"} you in <span className="font-semibold" style={{ color: "var(--color-text)" }}>{groupName}</span>.
             </p>
           </>
         ) : (
@@ -170,12 +176,10 @@ export function InAppInvite({ code, heading = "Your friend's code" }: { code: st
 
   return (
     <div className="flex flex-col items-center gap-3 text-center">
-      <p className="text-sm font-semibold uppercase" style={{ letterSpacing: "0.1em", color: "var(--color-muted)" }}>
+      <p className="text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>
         {heading}
       </p>
-      <p className="font-mono font-semibold select-all text-headline tracking-[0.2em]" style={{ color: "var(--color-text)" }}>
-        {shown}
-      </p>
+      <InviteCodeChip code={code} size="lg" />
       <p style={{ color: "var(--color-text-secondary)" }}>{IN_APP_OPEN_LINE}</p>
       <button type="button" onClick={copyLink} className="btn-primary w-full px-6 py-3">
         {status?.ok ? <CheckIcon /> : <CopyIcon />}

@@ -121,6 +121,7 @@ describe("POST /api/groups (create)", () => {
     expect(groupInsert.payload).toMatchObject({ owner_id: USER.id, share_teaser: true });
     expect((groupInsert.payload as { owner_teaser: unknown }).owner_teaser).toMatchObject({
       statLabel: "of Netflix watched",
+      nickname: "Sam",
     });
 
     expect(memberInsert).toMatchObject({ table: "members", op: "insert", terminal: "single" });
@@ -130,6 +131,24 @@ describe("POST /api/groups (create)", () => {
     expect(p.nickname).toBe("Sam");
     expect(p.wrapped_data.allBingeSessions).toEqual([]);
     expect((p.wrapped_data.longestBinge as { titles: unknown[] }).titles).toEqual([]);
+  });
+
+  it("leaves the \"Me\" placeholder (or no nickname) off the teaser", async () => {
+    for (const nickname of ["Me", undefined]) {
+      const fake = setup({
+        user: USER,
+        query: (c) => (c.table === "groups" ? { data: GROUP_ROW, error: null } : { data: { id: "m1" }, error: null }),
+      });
+      await POST(
+        req("/api/groups", {
+          method: "POST",
+          body: { name: "Couch Club", nickname, wrapped_data: wirePayload(), share_teaser: true },
+        })
+      );
+      const teaser = (fake.calls[0].payload as { owner_teaser: Record<string, unknown> }).owner_teaser;
+      expect(teaser).not.toHaveProperty("nickname");
+      expect(teaser.personality).toEqual(expect.any(String));
+    }
   });
 
   it("ignores share_teaser without stats", async () => {

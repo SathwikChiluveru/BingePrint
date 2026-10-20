@@ -33,7 +33,9 @@ export type Personality =
   | "The Night Owl"
   | "The Weekend Warrior"
   | "The Loyalist"
-  | "The Genre Surfer"
+  // Was "The Genre Surfer": the export has no genre data, only how many different titles got a try.
+  // Older stored stats are upgraded on load (upgradeStoredStats in src/lib/csv/stats.ts).
+  | "The Channel Surfer"
   | "The Casual Viewer";
 
 export interface WrappedStats {

@@ -5,10 +5,11 @@ import Link from "next/link";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import type { WrappedStats } from "@/types";
 import { isPendingInviteFresh, useAutoplayedStore } from "@/lib/store";
+import { groupNameForButton } from "@/lib/copy/invite";
 import { Slide1Intro } from "./slides/Slide1Intro";
 import { Slide2TotalHours } from "./slides/Slide2TotalHours";
 import { Slide3TopShow } from "./slides/Slide3TopShow";
-import { Slide4TopShows, topShowsShare } from "./slides/Slide4TopShows";
+import { Slide4TopShows, distinctTitlesPhrase, topShowsHero } from "./slides/Slide4TopShows";
 import { Slide5BingeBeast } from "./slides/Slide5BingeBeast";
 import { Slide6NightOwl } from "./slides/Slide6NightOwl";
 import { Slide7DayHeatmap } from "./slides/Slide7DayHeatmap";
@@ -103,10 +104,10 @@ function slideSummary(type: unknown, stats: WrappedStats): string | null {
     case Slide3TopShow:
       return stats.topShows?.[0]?.title ?? null;
     case Slide4TopShows: {
-      const shows = (stats.topShows ?? []).slice(0, 5);
-      const units = estimated ? stats.totalEpisodesEstimate : (stats.distinctTitleDays ?? stats.totalEpisodesEstimate);
-      const share = topShowsShare(shows, units ?? 0);
-      return share > 0 ? `${share}% of everything you watched` : null;
+      // Same hero as the slide: the top list's share, or with 5 or fewer the distinct count.
+      const hero = topShowsHero(stats);
+      if (!hero) return null;
+      return hero.kind === "share" ? `${hero.value}% of everything you watched` : distinctTitlesPhrase(hero.value);
     }
     case Slide5BingeBeast: {
       const b = stats.longestBinge;
@@ -285,10 +286,11 @@ export function SlideShow({ stats, sessionId }: Props) {
   // group waits at the end. Not on an empty reel, whose card has no group step.
   const pendingInvite = useAutoplayedStore((s) => s.pendingInvite);
   const myGroup = useAutoplayedStore((s) => s.myGroup);
-  const waitingGroup =
-    !emptyReel && isPendingInviteFresh(pendingInvite) && pendingInvite.code !== myGroup?.inviteCode
-      ? pendingInvite.groupName?.trim() || "Your group"
-      : null;
+  const invited =
+    !emptyReel && isPendingInviteFresh(pendingInvite) && pendingInvite.code !== myGroup?.inviteCode;
+  const waitingGroup = invited ? pendingInvite?.groupName?.trim() || "Your group" : null;
+  // Invitees came for the comparison: a quiet way straight to it (the card, where the group waits).
+  const skipToGroupLabel = invited ? `Skip to ${groupNameForButton(pendingInvite?.groupName)}` : null;
 
   const sectionRef = useRef<HTMLElement>(null);
   // Set by goTo, consumed by the focus effect after the new slide commits.
@@ -496,6 +498,11 @@ export function SlideShow({ stats, sessionId }: Props) {
                   stats={stats}
                   waitingGroup={waitingGroup}
                   onSkipToCard={viewedBefore && totalSlides > 2 ? () => goTo(totalSlides - 1, "button") : undefined}
+                  skipToGroup={
+                    skipToGroupLabel && totalSlides > 2
+                      ? { label: skipToGroupLabel, onSkip: () => goTo(totalSlides - 1, "button") }
+                      : null
+                  }
                 />
               ) : (
                 slides[current]
@@ -666,6 +673,20 @@ export function SlideShow({ stats, sessionId }: Props) {
           >
             <Chevron direction="left" />
           </button>
+        )}
+        {/*
+          Home (mobile, last slide): the X is hidden here, so this is the exit. Quiet text, 44px tall,
+          bottom-right opposite Back, inside the same reserve below the card's CTAs. No confirm: the
+          reel is finished and the stats stay saved on this device.
+        */}
+        {isLast && (
+          <Link
+            href="/"
+            className="fixed right-3 z-10 inline-flex md:hidden items-center min-h-[44px] px-3 text-sm underline-offset-4 hover:underline"
+            style={{ bottom: `calc(12px + ${SAFE_BOTTOM})`, color: "var(--color-text-secondary)" }}
+          >
+            Home
+          </Link>
         )}
 
         {/* Arrow buttons (desktop). Prev stays on the last slide; it sits left of the card. */}

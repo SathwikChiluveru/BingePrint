@@ -1,5 +1,6 @@
 import type { GroupMember, Personality, WrappedStats } from "@/types";
 import { memberHasTime, memberTitles, memberTitlesInflated } from "@/components/groups/memberStats";
+import { upgradeStoredStats } from "@/lib/csv/stats";
 
 /**
  * Pure comparison logic for /groups/[groupId]/compare.
@@ -94,14 +95,16 @@ const PERSONALITY_JAB: Record<Personality, string> = {
   "The Night Owl": "The Night Owl. Sleep is a rumor.",
   "The Weekend Warrior": "The Weekend Warrior. Saturdays never stood a chance.",
   "The Loyalist": "The Loyalist. Same show, forever.",
-  "The Genre Surfer": "The Genre Surfer. Commits to nothing.",
+  "The Channel Surfer": "The Channel Surfer. Commits to nothing.",
   "The Casual Viewer": "The Casual Viewer. Suspiciously well adjusted.",
 };
 
 /** One roast line per member: personality jab, top show, biggest day. Shared with the group page. */
 export function memberRoast(d: Data): string {
   const parts: string[] = [];
-  parts.push(PERSONALITY_JAB[d.personality] ?? `${d.personality}.`);
+  // Members stored by an older build may still say "The Genre Surfer"
+  const { personality } = upgradeStoredStats(d);
+  parts.push(PERSONALITY_JAB[personality] ?? `${personality}.`);
 
   const top = d.topShows?.[0];
   if (top && top.watchCount > 0) {
@@ -181,7 +184,20 @@ function pickMax<T>(items: T[], score: (t: T) => number): T | null {
  * Ranks members by the fair metric (titles if anyone is date-only, else hours). Ties share a rank.
  * Works for any count, including zero or one member; the group page uses it for its member rows.
  */
-export function rankMembers(members: GroupMember[], myUserId: string | null): { metric: Metric; ranked: RankedMember[] } {
+/**
+ * Stored members carry whatever wording their build wrote ("The Genre Surfer", the old Casual
+ * Viewer line that repeated the total); bring them up to date before anything is shown.
+ * Members that need no change keep their object identity.
+ */
+export function upgradeMembers(members: GroupMember[]): GroupMember[] {
+  return members.map((m) => {
+    const upgraded = upgradeStoredStats(m.wrapped_data);
+    return upgraded === m.wrapped_data ? m : { ...m, wrapped_data: upgraded };
+  });
+}
+
+export function rankMembers(rawMembers: GroupMember[], myUserId: string | null): { metric: Metric; ranked: RankedMember[] } {
+  const members = upgradeMembers(rawMembers);
   const metric: Metric = members.some((m) => !memberHasTime(m.wrapped_data)) ? "titles" : "hours";
   const valueOf = (d: Data) => (metric === "titles" ? titlesOf(d) : hoursOf(d));
 
@@ -208,7 +224,8 @@ export function rankMembers(members: GroupMember[], myUserId: string | null): { 
 }
 
 /** Needs at least one member; the compare page only calls it with two or more. */
-export function buildComparison(members: GroupMember[], myUserId: string | null): Comparison {
+export function buildComparison(rawMembers: GroupMember[], myUserId: string | null): Comparison {
+  const members = upgradeMembers(rawMembers);
   const { metric, ranked } = rankMembers(members, myUserId);
   const me = ranked.find((r) => r.isMe) ?? null;
   const { headline, punchline } = headToHead(metric, ranked, me);

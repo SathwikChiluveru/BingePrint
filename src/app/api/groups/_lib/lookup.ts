@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isOwnerTeaser, type GroupPreview } from "@/lib/supabase/groups";
+import { cleanOwnerTeaser, type GroupPreview } from "@/lib/supabase/groups";
 
 export type LookupResult =
   | { ok: true; group: GroupPreview }
@@ -43,7 +43,7 @@ export async function lookupByInviteCode(
       id: row.id,
       name: row.name,
       invite_code: code,
-      owner_teaser: optedIn && isOwnerTeaser(row.owner_teaser) ? row.owner_teaser : null,
+      owner_teaser: optedIn ? cleanOwnerTeaser(row.owner_teaser) : null,
       preview: true,
     },
   };

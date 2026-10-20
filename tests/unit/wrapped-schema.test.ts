@@ -116,6 +116,20 @@ describe("buildOwnerTeaser", () => {
     const s = WrappedDataSchema.parse(wireStats("full-export.csv"));
     expect(buildOwnerTeaser(s)).toEqual({ personality: "The Weekend Warrior", statValue: "5h", statLabel: "of Netflix watched" });
   });
+
+  it("adds a trimmed nickname, and leaves out blanks, the \"Me\" placeholder and over-long names", () => {
+    const s = WrappedDataSchema.parse(wireStats("full-export.csv"));
+    expect(buildOwnerTeaser(s, "  Sam ")).toMatchObject({ nickname: "Sam", personality: "The Weekend Warrior" });
+    for (const name of [undefined, null, "", "   ", "Me", "me", "n".repeat(31)]) {
+      expect(buildOwnerTeaser(s, name)).not.toHaveProperty("nickname");
+    }
+  });
+
+  it("stores the renamed Genre Surfer personality under its new name", () => {
+    const s = WrappedDataSchema.parse({ ...wireStats("full-export.csv"), personality: "The Genre Surfer" });
+    expect(s.personality).toBe("The Channel Surfer");
+    expect(buildOwnerTeaser(s).personality).toBe("The Channel Surfer");
+  });
 });
 
 describe("readJson", () => {

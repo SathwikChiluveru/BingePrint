@@ -2,15 +2,19 @@
 
 import Link from "next/link";
 import { MotionConfig, motion } from "framer-motion";
+import { SAMPLE_VERSUS } from "./sampleData";
 
 const SMOOTH = [0.4, 0, 0.2, 1] as const;
 
 type Member = { name: string; titles: number; bestDay: number; personality: string };
 
-/** Illustrative group. "You" uses the sample reel; the others are made-up sample rows. */
+const toNumber = (value: string) => Number(value.replace(/,/g, ""));
+const [YOU, ROOMMATE] = SAMPLE_VERSUS;
+
+/** Illustrative group. "You" and "Roommate" share the sample reel's numbers; the admin is a made-up sample row. */
 const MEMBERS: Member[] = [
-  { name: "You", titles: 5626, bestDay: 51, personality: "The Binge Lord" },
-  { name: "Roommate", titles: 2140, bestDay: 19, personality: "The Weekend Warrior" },
+  { name: YOU.name, titles: toNumber(YOU.value), bestDay: 51, personality: "The Binge Lord" },
+  { name: ROOMMATE.name, titles: toNumber(ROOMMATE.value), bestDay: 19, personality: "The Weekend Warrior" },
   { name: "Group chat admin", titles: 3388, bestDay: 27, personality: "The Loyalist" },
 ];
 
@@ -86,16 +90,14 @@ export function GroupTeaser() {
               Your own reel is the warm-up. Start a group, share the 8-character invite code, and every
               friend who joins lands on the same screen, stat for stat. Nobody gets to round down.
             </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <Link href="/upload" className="btn-primary px-6 py-3 text-base">
-                Get my reel, then start a group
-              </Link>
+            {/* One quiet action: the red stays with the hero and the closing call; groups start from the reel's last slide */}
+            <div className="mt-8">
               <Link href="/groups?mode=join" className="btn-secondary px-6 py-3 text-base">
                 Join a friend&apos;s group
               </Link>
             </div>
             <p className="mt-3 text-sm" style={{ color: "var(--color-muted)" }}>
-              Groups need a quick sign-in. Your reel doesn&apos;t.
+              Starting one? It&apos;s the last slide of your reel. Groups need a quick sign-in; your reel doesn&apos;t.
             </p>
           </div>
 
@@ -135,7 +137,7 @@ export function GroupTeaser() {
                 className="mt-7 border-t pt-5 text-base font-semibold leading-snug"
                 style={{ borderColor: "var(--color-border)", textWrap: "balance" }}
               >
-                Roommate watched 2,140 titles and still calls you the problem.
+                The admin started this group to prove a point. The point was you.
               </p>
             </div>
             <figcaption className="mt-3 text-sm" style={{ color: "var(--color-muted)" }}>

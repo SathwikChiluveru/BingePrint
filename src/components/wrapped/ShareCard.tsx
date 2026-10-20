@@ -13,6 +13,8 @@ import {
   type ShareImageStats,
 } from "@/lib/share/renderShareImage";
 import { safeInviteCode } from "@/lib/share/safety";
+import { upgradeStoredStats } from "@/lib/csv/stats";
+import InviteCodeChip from "@/components/groups/InviteCodeChip";
 
 // Older stored stats may lack topShows / totalEpisodesEstimate / hasTimeData; every field is guarded.
 export type ShareCardStats = ShareImageStats;
@@ -62,6 +64,8 @@ interface ShareCardProps {
   inviteCode?: string;
   /** Viewer created the group: "Join my group" instead of "Join our group". */
   ownedByMe?: boolean;
+  /** The invite label reads "Join {groupName}" when the name fits (same rule as the PNG). */
+  groupName?: string | null;
 }
 
 /**
@@ -69,11 +73,12 @@ interface ShareCardProps {
  * with the hero in the red gradient):
  * personality hero, roast line, top-show punchline, one total, then the invite panel when there is a code.
  */
-export function ShareCard({ stats, inviteCode, ownedByMe }: ShareCardProps) {
+export function ShareCard({ stats, inviteCode, ownedByMe, groupName }: ShareCardProps) {
   const host = useHost();
   // Scale and blur are motion; reduced motion gets an opacity-only arrival.
   const reduce = useReducedMotion();
-  const personality = stats.personality?.trim() || "The Casual Viewer";
+  // Older stored stats may still say "The Genre Surfer" (renamed); same rule as the PNG.
+  const personality = upgradeStoredStats(stats).personality?.trim() || "The Casual Viewer";
   const roast = shareRoastLine(stats);
   const topShowLine = pickTopShowLine(stats);
   const total = pickShareTotal(stats);
@@ -177,24 +182,19 @@ export function ShareCard({ stats, inviteCode, ownedByMe }: ShareCardProps) {
           </p>
 
           {code && (
-            <div
-              className="mt-4 rounded-2xl px-4 py-3 short:mt-3 short:py-2"
-              style={{ background: "var(--color-surface-2)", border: "1px solid var(--color-border-strong)" }}
-            >
+            // Label, one mono chip (DESIGN.md "Displayed codes"), then the join link. No panel
+            // around it: a chip inside a panel inside the card would nest three surfaces.
+            <div className="mt-4 flex flex-col items-center short:mt-3">
               <p
-                className="uppercase font-semibold text-xs"
+                className="max-w-full truncate uppercase font-semibold text-xs"
                 style={{ color: "var(--color-muted)", letterSpacing: "0.1em" }}
               >
-                {inviteLabel(ownedByMe)}
+                {inviteLabel(ownedByMe, groupName)}
               </p>
-              <p
-                className="mt-1 font-mono font-bold text-title tracking-[0.18em]"
-                style={{ color: "var(--color-text)" }}
-              >
-                {code}
-              </p>
+              {/* Same chip as the group pages, so a code looks the same on every surface */}
+              <InviteCodeChip code={code} size="md" className="mt-1.5" />
               {host && (
-                <p className="mt-1 text-xs truncate" style={{ color: "var(--color-text-secondary)" }}>
+                <p className="mt-1.5 max-w-full text-xs truncate" style={{ color: "var(--color-text-secondary)" }}>
                   {host}/groups?join={code}
                 </p>
               )}

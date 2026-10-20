@@ -10,6 +10,7 @@ import { ArrowLeftIcon, ArrowRightIcon } from "@/components/groups/icons";
 import { suggestGroupName, suggestNickname } from "@/components/groups/memberStats";
 import InviteFrame, { InAppInvite, NetflixFileSteps, useInAppBrowser } from "@/components/groups/InviteFrame";
 import MyGroupsList from "@/components/groups/MyGroupsList";
+import InviteCodeChip from "@/components/groups/InviteCodeChip";
 import { toGroupSummary } from "@/lib/share/safety";
 import {
   CREATE_GROUP_INCOMPLETE_MESSAGE,
@@ -25,7 +26,6 @@ import {
 import {
   INVITE_CODE_MAX_LENGTH,
   INVITE_CODE_PLACEHOLDER,
-  displayInviteCode,
   isValidInviteCode,
   normalizeInviteCode,
   type GroupPreview,
@@ -178,7 +178,7 @@ function GroupsContent() {
       setError(
         outcome.kind === "not-found" ? (
           <>
-            No group uses the code <span className="font-mono">{displayInviteCode(code)}</span>. Check it with whoever sent it,
+            No group uses the code <InviteCodeChip code={code} size="inline" />. Check it with whoever sent it,
             or start your own group.
           </>
         ) : outcome.kind === "rate-limited" ? (
@@ -325,7 +325,7 @@ function GroupsContent() {
     return (
       <PageShell>
         <p role="status" className="text-center" style={{ color: "var(--color-text-secondary)" }}>
-          Finding the group for code <span className="font-mono">{displayInviteCode(joinParam)}</span>…
+          Finding the group for code <InviteCodeChip code={joinParam} size="inline" />…
         </p>
       </PageShell>
     );
@@ -371,7 +371,7 @@ function GroupsContent() {
     <PageShell>
       {mode === "choose" && (
         <motion.div className="flex flex-col" {...enter}>
-          <h1 className="text-display font-black" style={{ textWrap: "balance" }}>
+          <h1 className="text-headline font-black" style={{ textWrap: "balance" }}>
             Someone in your group chat has a problem.
           </h1>
           <p className="mt-4 text-lg" style={{ color: "var(--color-text-secondary)" }}>
@@ -513,7 +513,8 @@ function GroupsContent() {
             href={`/auth/login?next=${encodeURIComponent(`/groups?join=${encodeURIComponent(signInCode)}`)}`}
             className="btn-primary py-3"
           >
-            Sign in to see the invite
+            {/* With a reel on hand, signing in is the step to adding it: same name as everywhere else */}
+            {wrappedStats ? JOIN_ACTIONS.signInToAdd : "Sign in to see the invite"}
             <ArrowRightIcon />
           </Link>
           {!wrappedStats && (
@@ -522,7 +523,7 @@ function GroupsContent() {
               className="self-center inline-flex items-center min-h-[44px] px-3 text-sm underline underline-offset-4"
               style={{ color: "var(--color-text-secondary)" }}
             >
-              Make my reel first
+              {JOIN_ACTIONS.makeReel} first
             </Link>
           )}
         </motion.div>

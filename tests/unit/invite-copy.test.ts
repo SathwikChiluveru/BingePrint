@@ -11,6 +11,12 @@ import {
   inviteShareText,
   inviteShareTitle,
   inviteUrl,
+  inviterKicker,
+  leaveGroupConfirmLine,
+  leaveGroupErrorMessage,
+  leaveGroupLabel,
+  nicknameErrorMessage,
+  renameGroupErrorMessage,
   teaserFormDisclosure,
   updateStatsLabel,
   uploadWithInviteHref,
@@ -149,5 +155,40 @@ describe("invite copy: group entry points and sign-in lines", () => {
   it("counts new members since the last visit", async () => {
     const { newSinceLastVisitLine } = await import("@/lib/copy/invite");
     expect(newSinceLastVisitLine(2)).toBe("New since your last visit: 2 joined.");
+  });
+});
+
+describe("invite copy: teaser names the inviter", () => {
+  it("kicker uses the nickname, else \"Your friend is\"", () => {
+    expect(inviterKicker("Sam")).toBe("Sam is");
+    expect(inviterKicker("  ")).toBe("Your friend is");
+    expect(inviterKicker(null)).toBe("Your friend is");
+  });
+
+  it("disclosures say friends see your name", () => {
+    expect(teaserFormDisclosure("The Loyalist", true)).toMatch(/your name/);
+  });
+});
+
+describe("invite copy: rename, nickname and leave", () => {
+  it("shortens long group names in the leave label", () => {
+    expect(leaveGroupLabel("Crew")).toBe("Leave Crew");
+    expect(leaveGroupLabel("x".repeat(40))).toBe("Leave this group");
+  });
+
+  it("tells owners the group stays theirs", () => {
+    expect(leaveGroupConfirmLine(true)).toMatch(/stays yours/);
+    expect(leaveGroupConfirmLine(false)).toMatch(/invite code again/);
+  });
+
+  it("every status gets owned copy, never \"try again in a moment\" for client errors", () => {
+    for (const fn of [renameGroupErrorMessage, nicknameErrorMessage, leaveGroupErrorMessage]) {
+      for (const status of [0, 401, 404, 422, 429, 500]) {
+        const m = fn(status);
+        expect(m.length).toBeGreaterThan(10);
+        expect(m).not.toMatch(/in a moment/);
+      }
+    }
+    expect(renameGroupErrorMessage(403)).toMatch(/Only the person/);
   });
 });

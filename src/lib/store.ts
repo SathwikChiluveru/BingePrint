@@ -131,15 +131,57 @@ export function clearMyGroupIfStale(sessionId: string | null | undefined): boole
 }
 
 /**
+ * Forget the stored group when it is `groupId` (after leaving it). Returns true when it was cleared.
+ * The pending invite for the same group goes too, so the reel stops sending the user back there.
+ */
+export function forgetMyGroup(groupId: string): boolean {
+  const { myGroup, pendingInvite, setMyGroup, setPendingInvite } = useAutoplayedStore.getState();
+  if (pendingInvite?.groupId === groupId) setPendingInvite(null);
+  if (myGroup?.id !== groupId) return false;
+  setMyGroup(null);
+  return true;
+}
+
+// Codes already looked up (or being looked up) this page load, so a re-render never repeats it
+const enrichedCodes = new Set<string>();
+
+/**
+ * Fills in the pending invite's group name and id from the public lookup
+ * (GET /api/groups/lookup?code=), once per code per page load. Best effort: any failure (offline,
+ * 404, 429, sign-in needed) leaves the invite as it is. Only writes when the stored invite is
+ * still the same code, so a newer invite is never overwritten.
+ */
+async function enrichPendingInvite(code: string): Promise<void> {
+  if (enrichedCodes.has(code) || typeof fetch !== "function") return;
+  enrichedCodes.add(code);
+  try {
+    const res = await fetch(`/api/groups/lookup?code=${encodeURIComponent(code)}`, { cache: "no-store" });
+    if (!res.ok) return;
+    const body = (await res.json().catch(() => null)) as { id?: unknown; name?: unknown } | null;
+    if (!body || typeof body.id !== "string" || typeof body.name !== "string" || !body.id || !body.name) return;
+    const { pendingInvite, setPendingInvite } = useAutoplayedStore.getState();
+    if (!pendingInvite || pendingInvite.code !== code) return;
+    setPendingInvite({ ...pendingInvite, groupName: body.name, groupId: body.id });
+  } catch {
+    // Network or parse failure: the code alone still works
+  }
+}
+
+/**
  * Restore the invite from a `?join=CODE` URL param (another browser, or an upload link that
  * carried it). Validates and normalizes the code; anything malformed is ignored. A fresh saved
  * invite for the same code keeps its group name and id. Returns the adopted code, or null.
+ * When the name or id is missing, one public lookup fills them in the background (never throws).
  */
 export function adoptJoinParam(raw: string | null | undefined): string | null {
   const code = normalizeInviteCode(raw);
   if (!isValidInviteCode(code)) return null;
   const { pendingInvite, setPendingInvite } = useAutoplayedStore.getState();
-  if (isPendingInviteFresh(pendingInvite) && pendingInvite.code === code) return code;
+  if (isPendingInviteFresh(pendingInvite) && pendingInvite.code === code) {
+    if (!pendingInvite.groupName || !pendingInvite.groupId) void enrichPendingInvite(code);
+    return code;
+  }
   setPendingInvite({ code });
+  void enrichPendingInvite(code);
   return code;
 }
