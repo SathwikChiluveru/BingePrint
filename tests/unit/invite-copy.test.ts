@@ -131,3 +131,23 @@ describe("createGroupErrorMessage", () => {
     for (const s of [400, 413, 422, 429]) expect(createGroupErrorMessage(s)).not.toMatch(/in a moment/i);
   });
 });
+
+describe("invite copy: group entry points and sign-in lines", () => {
+  it("names the entry points and never uses '&'", async () => {
+    const { GROUP_ACTIONS } = await import("@/lib/copy/invite");
+    expect(GROUP_ACTIONS.startMyGroup).toBe("Start my group");
+    expect(GROUP_ACTIONS.signInAndStart).toBe("Sign in and start my group");
+    for (const v of Object.values(GROUP_ACTIONS)) expect(v).not.toContain("&");
+  });
+
+  it("starts the sign-in line from the personality when a reel exists", async () => {
+    const { signInToStartLine } = await import("@/lib/copy/invite");
+    expect(signInToStartLine("The Casual Viewer")).toBe("Sign in to start The Casual Viewer's group.");
+    expect(signInToStartLine(null)).toBe("Sign in to start your group.");
+  });
+
+  it("counts new members since the last visit", async () => {
+    const { newSinceLastVisitLine } = await import("@/lib/copy/invite");
+    expect(newSinceLastVisitLine(2)).toBe("New since your last visit: 2 joined.");
+  });
+});

@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { isInAppBrowser } from "@/lib/share/safety";
 import { isPendingInviteFresh, useAutoplayedStore } from "@/lib/store";
+import { signInToStartLine } from "@/lib/copy/invite";
 import { DEFAULT_NEXT, safeNext } from "../safe-next";
 
 // In-app webviews (Instagram, Facebook, WhatsApp, Line, Snapchat, TikTok, the Google app) block
@@ -18,6 +19,16 @@ function useInAppBrowser(): boolean {
   return useSyncExternalStore(
     noopSubscribe,
     () => isInAppBrowser(),
+    () => false
+  );
+}
+
+// Phones and tablets: a tapped email link often opens in the mail app's browser or the default
+// browser, not this one, so the reel isn't there. The code is the default on coarse pointers too.
+function useCoarsePointer(): boolean {
+  return useSyncExternalStore(
+    noopSubscribe,
+    () => typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)").matches,
     () => false
   );
 }
@@ -68,14 +79,17 @@ function useHydrated(): boolean {
  * "Lives in this browser" only when there is a local reel to protect. Invitees without one
  * get the group they're joining (from the saved invite, never from the URL).
  */
-function intentLine(next: string, hasStats: boolean, inviteGroup: string | null): string {
+function intentLine(next: string, personality: string | null, inviteGroup: string | null): string {
+  const creating = next.includes("mode=create");
   // Any fresh invite names its group, unless they are signing in to start their own
-  const toGroup = inviteGroup && !next.includes("mode=create") ? inviteGroup : null;
-  if (hasStats && toGroup) return `Sign in to join ${toGroup}. Your reel lives in this browser, so sign in here.`;
-  if (hasStats && (next.startsWith("/wrapped/") || next.startsWith("/groups"))) {
-    return "Your reel lives in this browser. Sign in here.";
+  const toGroup = inviteGroup && !creating ? inviteGroup : null;
+  if (personality && creating) return `${signInToStartLine(personality)} Your reel lives in this browser.`;
+  if (personality && toGroup) return `Sign in to join ${toGroup} as ${personality}. Your reel lives in this browser.`;
+  if (personality && (next.startsWith("/wrapped/") || next.startsWith("/groups"))) {
+    return `Sign in to put ${personality} on a group board. Your reel lives in this browser.`;
   }
   if (toGroup) return `Sign in to join ${toGroup}.`;
+  if (creating) return signInToStartLine(null);
   return "Sign in to create or join a group with friends.";
 }
 
@@ -86,8 +100,10 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const inApp = useInAppBrowser();
+  const coarse = useCoarsePointer();
   const hydrated = useHydrated();
-  const hasStats = useAutoplayedStore((s) => s.wrappedStats !== null);
+  const storedPersonality = useAutoplayedStore((s) => s.wrappedStats?.personality ?? null);
+  const personality = hydrated ? storedPersonality : null;
   const pendingInvite = useAutoplayedStore((s) => s.pendingInvite);
   // An invite adopted from a ?join link has no name yet: still say there is a group waiting
   const inviteGroup =
@@ -96,9 +112,9 @@ function LoginForm() {
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<Step>("email");
-  // null = not chosen yet: code in in-app browsers, link elsewhere
+  // null = not chosen yet: code in in-app browsers and on touch devices, link on desktop
   const [chosenMethod, setChosenMethod] = useState<Method | null>(null);
-  const method: Method = chosenMethod ?? (inApp ? "code" : "link");
+  const method: Method = chosenMethod ?? (inApp || coarse ? "code" : "link");
   // `redirectTo` is the older name, still accepted so old links keep working
   const next = safeNext(searchParams.get("next") ?? searchParams.get("redirectTo")) ?? DEFAULT_NEXT;
   const callbackFailed = searchParams.get("error") === "auth_failed";
@@ -215,37 +231,26 @@ function LoginForm() {
       </Link>
       <h1 className="text-title font-semibold">Sign in</h1>
       <p className="text-sm mt-1 mb-6" style={{ color: "var(--color-text-secondary)" }}>
-        {intentLine(next, hydrated && hasStats, inviteGroup)}
+        {intentLine(next, personality, inviteGroup)}
       </p>
 
-      {step === "link-sent" && (
-        <div role="status" className="flex flex-col gap-3 py-2">
-          <p className="font-semibold">Check your email</p>
-          <p style={{ color: "var(--color-text-secondary)" }}>
-            We sent a sign-in link to <strong>{email}</strong>. Open it on this device, in this browser, so your
-            reel is still here.
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              setChosenMethod("code");
-              setStep("code-sent");
-              setError("");
-            }}
-            className={quietButton}
-            style={{ color: "var(--color-text-secondary)" }}
-          >
-            The email has a code? Enter it here
-          </button>
-        </div>
-      )}
-
-      {step === "code-sent" && (
+      {/* Both sent steps carry the code field: a tapped link can open in another browser, the code can't */}
+      {(step === "link-sent" || step === "code-sent") && (
         <form onSubmit={handleVerify} className="flex flex-col gap-3">
-          <p role="status" style={{ color: "var(--color-text-secondary)" }}>
-            We sent a 6-digit code to <strong style={{ color: "var(--color-text)" }}>{email}</strong>. Enter it
-            here. Keep this tab open.
-          </p>
+          {step === "link-sent" ? (
+            <div role="status" className="flex flex-col gap-1">
+              <p className="font-semibold">Check your email</p>
+              <p style={{ color: "var(--color-text-secondary)" }}>
+                We sent a sign-in link to <strong style={{ color: "var(--color-text)" }}>{email}</strong>. The
+                email has a 6-digit code too: type it here, in this same browser, so your reel comes with you.
+              </p>
+            </div>
+          ) : (
+            <p role="status" style={{ color: "var(--color-text-secondary)" }}>
+              We sent a 6-digit code to <strong style={{ color: "var(--color-text)" }}>{email}</strong>. Type it
+              here, in this same browser. Keep this tab open.
+            </p>
+          )}
           <label className="flex flex-col gap-2">
             <span className="text-sm font-medium" style={{ color: "var(--color-muted)" }}>
               Code
@@ -257,7 +262,7 @@ function LoginForm() {
               pattern="[0-9 ]{6,12}"
               maxLength={12}
               required
-              autoFocus
+              autoFocus={step === "code-sent"}
               placeholder="123456"
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/[^\d ]/g, ""))}
@@ -373,9 +378,15 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <div
-      className="min-h-screen flex flex-col items-center justify-center gap-6 px-4 py-8"
+      className="relative isolate min-h-screen flex flex-col items-center justify-center gap-6 px-4 py-8 overflow-hidden"
       style={{ background: "var(--color-bg)" }}
     >
+      {/* The screening room: the reel's red glow sits behind the card, the one red action sits on it */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10"
+        style={{ background: "var(--glow-hero)" }}
+      />
       <Suspense>
         <LoginForm />
       </Suspense>

@@ -11,7 +11,9 @@ import { isInAppBrowser, safeInviteCode, toGroupSummary } from "@/lib/share/safe
 import { suggestGroupName, suggestNickname } from "@/components/groups/memberStats";
 import { UserPlusIcon } from "@/components/groups/icons";
 import {
+  GROUP_ACTIONS,
   INVITE_ACTIONS,
+  JOIN_ACTIONS,
   createGroupErrorMessage,
   inviteShareText,
   inviteUrl,
@@ -53,10 +55,9 @@ const PRESS_AND_HOLD = "Press and hold the card to save it.";
 // One line at 375px under the create CTA (the long TEASER_DISCLOSURE wraps to two and pushes the
 // secondary row below the fold at 375x548). Same two facts: stats only, and the invite page teaser.
 const SHORT_DISCLOSURE = "Stats, never your file. Invites show your personality.";
-// Signed out, the sign-in step rides in the CTA label instead of an extra helper line.
-const SIGN_IN_AND_START = "Sign in & start my group";
-// A slow or hung group check never holds the CTA longer than this.
-const GROUP_CHECK_TIMEOUT_MS = 8000;
+// A slow or hung group check stops waiting after this. The card can be shared without its code
+// meanwhile, so the check never holds the CTA.
+const GROUP_CHECK_TIMEOUT_MS = 4000;
 
 function ShareIcon() {
   return (
@@ -153,8 +154,6 @@ export function Slide10Share({ stats, sessionId, autoCreate = false }: Props) {
       ? "invite"
       : "create";
   const groupConfirmed = mode === "invite" && !!myGroup && checkedGroupId === myGroup.id;
-  const groupUnconfirmed = mode === "invite" && !!myGroup && !groupConfirmed && unconfirmedGroupId === myGroup.id;
-  const waitingForGroup = mode === "invite" && !groupConfirmed && !groupUnconfirmed;
   // Validated so a malformed stored code never reaches the card or a URL
   const inviteCode = groupConfirmed ? safeInviteCode(myGroup?.inviteCode) : undefined;
   const ownedByMe = myGroup?.ownedByMe === true;
@@ -220,7 +219,9 @@ export function Slide10Share({ stats, sessionId, autoCreate = false }: Props) {
   const blobRef = useRef<Blob | null>(null);
   const pendingRef = useRef<Promise<Blob> | null>(null);
   useEffect(() => {
-    if (waitingForGroup || emptyReel) return;
+    // While a stored group is being checked the card renders without its code, so "Share my card"
+    // works straight away; a confirmed group re-renders it with the code.
+    if (emptyReel) return;
     let current = true;
     blobRef.current = null;
     const pending = renderShareImage(stats, { inviteCode, ownedByMe });
@@ -239,7 +240,7 @@ export function Slide10Share({ stats, sessionId, autoCreate = false }: Props) {
     return () => {
       current = false;
     };
-  }, [stats, inviteCode, ownedByMe, renderKey, waitingForGroup, emptyReel]);
+  }, [stats, inviteCode, ownedByMe, renderKey, emptyReel]);
 
   function goToSignIn() {
     const back = sessionId ? `/wrapped/${sessionId}?autoshare=1` : "/groups?mode=create";
@@ -431,7 +432,7 @@ export function Slide10Share({ stats, sessionId, autoCreate = false }: Props) {
   function handleShare() {
     // Taps while the card is still rendering fall through to render-on-click, which also
     // recovers when the background render failed.
-    if (share.kind === "busy" || share.kind === "creating" || waitingForGroup) return;
+    if (share.kind === "busy" || share.kind === "creating") return;
     const ready = blobRef.current;
     if (ready && blobReady) {
       deliver(ready);
@@ -456,8 +457,8 @@ export function Slide10Share({ stats, sessionId, autoCreate = false }: Props) {
 
   const busy = share.kind === "busy";
   const creating = share.kind === "creating";
-  const preparing = waitingForGroup || (createdName !== null && !blobReady);
-  const pendingLabel = waitingForGroup ? "Checking your group…" : "Making your card…";
+  const preparing = createdName !== null && !blobReady;
+  const pendingLabel = "Making your card…";
   const statusText =
     share.kind === "busy"
       ? "Making your card…"
@@ -481,13 +482,13 @@ export function Slide10Share({ stats, sessionId, autoCreate = false }: Props) {
       ? INVITE_ACTIONS.shareCardInvite
       : INVITE_ACTIONS.shareCard;
   // aria-disabled rather than disabled, so "Share it now" can hold focus straight after a create;
-  // handleShare ignores taps while busy or until a stored group is checked.
+  // handleShare ignores taps while busy. While a stored group is checked it shares the card alone.
   const shareButton = (primary: boolean) => (
     <button
       ref={primary ? shareNowRef : undefined}
       type="button"
       onClick={handleShare}
-      aria-disabled={busy || waitingForGroup || undefined}
+      aria-disabled={busy || undefined}
       aria-busy={busy || preparing}
       {...(primary ? { "data-slide-primary": "" } : {})}
       className={`${primary ? "btn-primary" : "btn-secondary"} w-full gap-2 px-6 py-3 aria-disabled:opacity-60 aria-disabled:cursor-wait`}
@@ -506,6 +507,14 @@ export function Slide10Share({ stats, sessionId, autoCreate = false }: Props) {
         ? `/groups?join=${encodeURIComponent(stackUpCode)}`
         : "/groups?mode=join"
     : null;
+  // Signed out with a known group: straight to sign-in, which returns to the group with its add
+  // form open (?add=1), instead of the group's pitch and then sign-in.
+  const stackUpSignInHref =
+    freshInvite?.groupId && stackUpCode && authUser === null
+      ? `/auth/login?next=${encodeURIComponent(
+          `/groups/${encodeURIComponent(freshInvite.groupId)}?code=${encodeURIComponent(stackUpCode)}&add=1`
+        )}`
+      : null;
 
   // A route into the group once one exists (after a create, after sharing, or an invite already
   // stored). Shown once the check settled or timed out, so a deleted group never flashes a link.
@@ -622,9 +631,15 @@ export function Slide10Share({ stats, sessionId, autoCreate = false }: Props) {
 
           {mode === "stackUp" && stackUpHref && freshInvite ? (
             <>
-              <Link href={stackUpHref} data-slide-primary="" className="btn-primary w-full px-6 py-3">
-                See how you stack up in {freshInvite.groupName ?? "your group"}
-              </Link>
+              {stackUpSignInHref ? (
+                <Link href={stackUpSignInHref} data-slide-primary="" className="btn-primary w-full px-6 py-3">
+                  {JOIN_ACTIONS.signInToAdd}
+                </Link>
+              ) : (
+                <Link href={stackUpHref} data-slide-primary="" className="btn-primary w-full px-6 py-3">
+                  See how you stack up in {freshInvite.groupName ?? "your group"}
+                </Link>
+              )}
               {shareButton(false)}
             </>
           ) : mode === "create" ? (
@@ -643,7 +658,7 @@ export function Slide10Share({ stats, sessionId, autoCreate = false }: Props) {
                 {creating
                   ? "Starting your group…"
                   : authUser === null
-                    ? SIGN_IN_AND_START
+                    ? GROUP_ACTIONS.signInAndStart // signed out: the sign-in step rides in the label
                     : INVITE_ACTIONS.startGroup}
               </button>
               <p className="text-xs leading-4" style={{ color: "var(--color-muted)", textWrap: "balance" }}>

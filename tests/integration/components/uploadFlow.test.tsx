@@ -1,4 +1,4 @@
-// File-to-reel flow through ReelDropZone (shares useReelUpload with /upload). The CSV is parsed
+// File-to-reel flow through the /upload page (drop zone + useReelUpload). The CSV is parsed
 // for real; only the router is mocked.
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
@@ -24,7 +24,7 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-import { ReelDropZone } from "@/components/landing/ReelDropZone";
+import UploadPage from "@/app/upload/page";
 
 function fileInput(container: HTMLElement) {
   const input = container.querySelector<HTMLInputElement>('input[type="file"]');
@@ -52,9 +52,9 @@ beforeEach(() => {
 
 afterEach(() => cleanup());
 
-describe("upload flow (ReelDropZone + useReelUpload)", () => {
+describe("upload flow (/upload + useReelUpload)", () => {
   it("rejects a non-CSV with copy that never says upload", async () => {
-    const { container } = renderCalm(<ReelDropZone />);
+    const { container } = renderCalm(<UploadPage />);
     await pick(container, csvFile("hello", "notes.txt", "text/plain"));
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("That's not a CSV.");
@@ -63,7 +63,7 @@ describe("upload flow (ReelDropZone + useReelUpload)", () => {
   });
 
   it("rejects the data-request zip with an unzip hint", async () => {
-    const { container } = renderCalm(<ReelDropZone />);
+    const { container } = renderCalm(<UploadPage />);
     await pick(container, new File(["PK"], "netflix-report.zip", { type: "application/zip" }));
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(/zip/i);
@@ -71,20 +71,20 @@ describe("upload flow (ReelDropZone + useReelUpload)", () => {
   });
 
   it("rejects a CSV with the wrong columns", async () => {
-    const { container } = renderCalm(<ReelDropZone />);
+    const { container } = renderCalm(<UploadPage />);
     await pick(container, csvFile("Name,Amount\nCoffee,3", "budget.csv"));
     expect(await screen.findByRole("alert")).toHaveTextContent("That CSV isn't a Netflix viewing history.");
     expect(h.push).not.toHaveBeenCalled();
   });
 
   it("rejects a header-only file as empty", async () => {
-    const { container } = renderCalm(<ReelDropZone />);
+    const { container } = renderCalm(<UploadPage />);
     await pick(container, csvFile(emptyCsv(), "NetflixViewingHistory.csv"));
     expect(await screen.findByRole("alert")).toHaveTextContent("That file has no watch history in it.");
   });
 
   it("accepts an uppercase .CSV and opens the reel", async () => {
-    const { container } = renderCalm(<ReelDropZone />);
+    const { container } = renderCalm(<UploadPage />);
     await pick(container, csvFile(dateOnlyCsv(), "NETFLIXVIEWINGHISTORY.CSV", ""));
     await waitFor(() => expect(h.push).toHaveBeenCalledTimes(1));
     const target = h.push.mock.calls[0][0] as string;
@@ -96,7 +96,7 @@ describe("upload flow (ReelDropZone + useReelUpload)", () => {
   });
 
   it("a timed CSV stores stats with time data", async () => {
-    const { container } = renderCalm(<ReelDropZone />);
+    const { container } = renderCalm(<UploadPage />);
     await pick(container, csvFile(timedCsv(), "ViewingActivity.csv"));
     await waitFor(() => expect(h.push).toHaveBeenCalled());
     expect(useAutoplayedStore.getState().wrappedStats?.hasTimeData).toBe(true);
@@ -104,7 +104,7 @@ describe("upload flow (ReelDropZone + useReelUpload)", () => {
 
   it("carries ?join=CODE into the reel URL and adopts the invite", async () => {
     window.history.replaceState(null, "", "/upload?join=ABCD-1234-EF");
-    const { container } = renderCalm(<ReelDropZone />);
+    const { container } = renderCalm(<UploadPage />);
     await waitFor(() => expect(useAutoplayedStore.getState().pendingInvite?.code).toBe("abcd1234ef"));
     await pick(container, csvFile(dateOnlyCsv(), "NetflixViewingHistory.csv"));
     await waitFor(() => expect(h.push).toHaveBeenCalledTimes(1));
@@ -113,7 +113,7 @@ describe("upload flow (ReelDropZone + useReelUpload)", () => {
 
   it("ignores a malformed join code", async () => {
     window.history.replaceState(null, "", "/upload?join=<script>");
-    const { container } = renderCalm(<ReelDropZone />);
+    const { container } = renderCalm(<UploadPage />);
     await pick(container, csvFile(dateOnlyCsv(), "NetflixViewingHistory.csv"));
     await waitFor(() => expect(h.push).toHaveBeenCalledTimes(1));
     expect(h.push.mock.calls[0][0]).not.toContain("join");
@@ -121,7 +121,7 @@ describe("upload flow (ReelDropZone + useReelUpload)", () => {
   });
 
   it("a drop uses the first file and the same validation", async () => {
-    const { container } = renderCalm(<ReelDropZone />);
+    const { container } = renderCalm(<UploadPage />);
     const zone = container.querySelector("[data-reel-dropzone]") as HTMLElement;
     const files = [csvFile(dateOnlyCsv(), "NetflixViewingHistory.csv"), csvFile("x", "other.csv")];
     fireEvent.drop(zone, { dataTransfer: { files, types: ["Files"] } });

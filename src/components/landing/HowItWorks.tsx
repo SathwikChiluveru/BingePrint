@@ -100,21 +100,20 @@ function ReelArtifact() {
 }
 
 function InviteArtifact() {
-  const code = "K7QM2XPA";
+  // One mono chip reads as a code to share; per-character boxes would read as an input to fill in
   return (
     <div className="w-full">
-      <div className="flex justify-between gap-1" aria-label={`Sample invite code ${code}`} role="img">
-        {code.split("").map((c, i) => (
-          <span
-            key={i}
-            aria-hidden="true"
-            className="flex h-11 flex-1 items-center justify-center rounded-[6px] text-lg font-semibold"
-            style={{ ...mono, background: "var(--color-surface-2)", border: "1px solid var(--color-border)" }}
-          >
-            {c}
-          </span>
-        ))}
-      </div>
+      <span
+        className="inline-flex min-h-11 items-center rounded-[6px] px-4 text-lg font-semibold"
+        style={{
+          ...mono,
+          letterSpacing: "0.2em",
+          background: "var(--color-surface-2)",
+          border: "1px solid var(--color-border)",
+        }}
+      >
+        K7QM2XPA
+      </span>
       <p className="mt-2 text-xs" style={{ color: "var(--color-muted)" }}>
         Sample invite code. Paste yours in the group chat.
       </p>
@@ -127,8 +126,8 @@ const steps: Step[] = [
     title: "Export your history",
     body: (
       <>
-        On netflix.com/viewingactivity, hit <strong className="font-semibold text-white">Download all</strong>. It
-        takes about 30 seconds. Do this in a browser, not the Netflix app.
+        Hit <strong className="font-semibold text-white">Download all</strong> at the bottom of
+        netflix.com/viewingactivity. Use a browser, not the app. About 30 seconds.
       </>
     ),
     artifact: <ExportArtifact />,
@@ -137,8 +136,8 @@ const steps: Step[] = [
     title: "Add the file",
     body: (
       <>
-        Autoplayed reads it on your device and keeps only the computed stats. Those go to our server only if you
-        choose to join a group.
+        It&apos;s read on your device. Only the computed stats are kept, and they reach our server only if you join
+        a group.
       </>
     ),
     artifact: <FileArtifact />,
@@ -147,8 +146,8 @@ const steps: Step[] = [
     title: "Sit through your reel",
     body: (
       <>
-        Up to ten slides of evidence: your watch time, top shows, longest binge, and a personality label you will want to
-        dispute. Your whole history, any time of year. If a number is estimated, the slide says so.
+        Up to ten slides of evidence: watch time, top shows, longest binge, and a personality label you will want to
+        dispute.
       </>
     ),
     artifact: <ReelArtifact />,
@@ -157,8 +156,8 @@ const steps: Step[] = [
     title: "Challenge your group",
     body: (
       <>
-        Start a group, drop the invite code in the chat, and everyone&apos;s stats land side by side. Groups need a
-        quick sign-in, and joining shares your stats with that group. Never your file.
+        Start a group and drop the code in the chat. Everyone&apos;s stats land side by side. Groups need a quick
+        sign-in and share your stats, never your file.
       </>
     ),
     artifact: <InviteArtifact />,

@@ -19,8 +19,8 @@ test("upload a quick export, watch every slide, reach the ending", async ({ page
   }
 
   // Signed out, the ending offers to sign in and start a group as its one red action
-  const cta = page.getByRole("button", { name: /Sign in & start my group/ }).or(
-    page.getByRole("link", { name: /Sign in & start my group/ })
+  const cta = page.getByRole("button", { name: /Sign in and start my group/ }).or(
+    page.getByRole("link", { name: /Sign in and start my group/ })
   );
   await expect(cta.first()).toBeVisible();
   await expect(page.locator(".btn-primary:visible")).toHaveCount(1);

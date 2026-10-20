@@ -76,7 +76,8 @@ describe("SlideShow", () => {
     show(statsFrom(timedCsv()));
     const n = dotTitles().length;
     await press("ArrowRight");
-    expect(live()).toBe(`Total watched, slide 2 of ${n}`);
+    // The announcement carries the slide's hero, not just its name
+    expect(live()).toMatch(new RegExp(`^Total watched: [\\d,]+ hours?, slide 2 of ${n}$`));
     expect(sessionStorage.getItem(`autoplayed:slide:${SESSION}`)).toBe("1");
     await press("ArrowLeft");
     expect(live()).toBe(`Intro, slide 1 of ${n}`);
@@ -100,12 +101,40 @@ describe("SlideShow", () => {
   it("resumes from sessionStorage, clamped to the last slide", () => {
     sessionStorage.setItem(`autoplayed:slide:${SESSION}`, "2");
     const { unmount } = show(statsFrom(timedCsv()));
-    expect(live()).toMatch(/^Top show, slide 3 of \d+$/);
+    expect(live()).toMatch(/^Top show: .+, slide 3 of \d+$/);
     unmount();
 
     sessionStorage.setItem(`autoplayed:slide:${SESSION}`, "99");
     show(statsFrom(timedCsv()));
     expect(live()).toMatch(/^Your card, slide (\d+) of \1$/);
+  });
+
+  it("a reel already watched to its card offers Skip to my card on the intro", async () => {
+    localStorage.clear();
+    const first = show(statsFrom(timedCsv()));
+    expect(screen.queryByRole("button", { name: "Skip to my card" })).toBeNull();
+    first.unmount();
+
+    localStorage.setItem(`autoplayed:viewed:${SESSION}`, "1");
+    sessionStorage.removeItem(`autoplayed:slide:${SESSION}`);
+    show(statsFrom(timedCsv()));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Skip to my card" }));
+    });
+    expect(live()).toMatch(/^Your card, slide (\d+) of \1$/);
+    localStorage.clear();
+  });
+
+  it("a fresh invite is named on the intro", () => {
+    const stats = statsFrom(timedCsv());
+    useAutoplayedStore.setState({
+      wrappedStats: stats,
+      sessionId: SESSION,
+      myGroup: null,
+      pendingInvite: { code: "abcd1234ef", groupName: "Film Night", savedAt: Date.now() },
+    });
+    renderCalm(<SlideShow stats={stats} sessionId={SESSION} />);
+    expect(screen.getByText("Film Night is waiting at the end.")).toBeInTheDocument();
   });
 
   it("ignores a garbage stored slide", () => {

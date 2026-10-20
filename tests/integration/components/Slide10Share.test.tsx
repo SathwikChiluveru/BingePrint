@@ -5,7 +5,7 @@ import { act, cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { INVITE_ACTIONS, updateStatsLabel } from "@/lib/copy/invite";
+import { INVITE_ACTIONS, JOIN_ACTIONS, updateStatsLabel } from "@/lib/copy/invite";
 import { PENDING_INVITE_TTL_MS, useAutoplayedStore, type MyGroup, type PendingInvite } from "@/lib/store";
 import { emptyStats, statsFrom, timedCsv } from "../fixtures/csv";
 import { primaries, renderCalm, stubBrowser } from "./helpers";
@@ -102,7 +102,7 @@ describe("create mode (no group, no invite)", () => {
     h.user = null;
     seed({});
     show();
-    const cta = await screen.findByRole("button", { name: "Sign in & start my group" });
+    const cta = await screen.findByRole("button", { name: "Sign in and start my group" });
     await userEvent.click(cta);
     expect(h.push).toHaveBeenCalledWith(`/auth/login?next=${encodeURIComponent("/wrapped/sess1?autoshare=1")}`);
     expect(fetchMock).not.toHaveBeenCalled();
@@ -162,6 +162,19 @@ describe("stackUp mode (fresh invite)", () => {
     );
   });
 
+  it("signed out with a known group: one link straight to sign-in, back to the group's add form", async () => {
+    h.user = null;
+    seed({ pendingInvite: { code: "abcd1234ef", groupId: GROUP.id, groupName: "Film Night", savedAt: Date.now() } });
+    const { container } = show();
+    const link = await screen.findByRole("link", { name: JOIN_ACTIONS.signInToAdd });
+    expect(link).toHaveAttribute(
+      "href",
+      `/auth/login?next=${encodeURIComponent(`/groups/${GROUP.id}?code=abcd1234ef&add=1`)}`
+    );
+    expect(primaries(container)).toEqual([link]);
+    expect(screen.queryByText(/stack up/)).toBeNull();
+  });
+
   it("an expired invite falls back to create mode", async () => {
     seed({ pendingInvite: { code: "abcd1234ef", groupName: "Film Night", savedAt: Date.now() - PENDING_INVITE_TTL_MS - 1 } });
     show();
@@ -174,8 +187,8 @@ describe("has-group mode", () => {
   it("checks the group first, then one red share-and-invite with the code", async () => {
     seed({ myGroup: GROUP });
     const { container } = show();
-    // While the check runs the code stays off the card
-    expect(screen.getByRole("button", { name: "Checking your group…" })).toBeInTheDocument();
+    // While the check runs the code stays off the card, and the card alone can already be shared
+    expect(screen.getByRole("button", { name: INVITE_ACTIONS.shareCard })).not.toHaveAttribute("aria-disabled");
     expect(screen.queryByText(SHOWN_CODE)).toBeNull();
 
     const cta = await screen.findByRole("button", { name: INVITE_ACTIONS.shareCardInvite });

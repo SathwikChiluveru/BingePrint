@@ -18,7 +18,7 @@ const MAX_BYTES = 50 * 1024 * 1024;
 const CSV_NAME = /\.csv$/i;
 const ZIP_NAME = /\.zip$/i;
 
-/** Marks every drop zone so the window-level guard lets drops land there. */
+/** Marks the drop zone so the window-level guard lets drops land there. */
 export const DROPZONE_ATTR = "data-reel-dropzone";
 
 // Copy about the file never says "upload": the file is read here and never leaves the browser.
@@ -69,7 +69,7 @@ function hasFiles(e: DragEvent) {
 }
 
 /**
- * Shared file-to-reel flow for every drop zone (landing hero, closing call, /upload).
+ * File-to-reel flow behind the /upload drop zone.
  * The CSV is parsed and summarised in the browser; only the computed stats reach the store.
  * A `join` invite in the URL is adopted on mount and carried into the reel URL.
  */
@@ -193,5 +193,5 @@ export function useReelUpload() {
   };
 }
 
-/** The one label for the parsing state, shared by every entry point. */
+/** The one label for the parsing state. */
 export const PARSING_LABEL = "Building your reel…";

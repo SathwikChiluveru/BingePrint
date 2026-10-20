@@ -28,6 +28,25 @@ export const JOIN_ACTIONS = {
   addReel: "Add my reel",
 } as const;
 
+/**
+ * Group entry points and sign-in variants. Signed-out labels always spell out "and", never "&",
+ * so screen readers and share previews read them the same way.
+ */
+export const GROUP_ACTIONS = {
+  /** /groups choose screen: opens the create form */
+  startMyGroup: "Start my group",
+  /** /groups choose screen: opens the code form */
+  joinWithCode: "Join with a code",
+  /** Signed-out version of startGroup (the reel's last slide) */
+  signInAndStart: "Sign in and start my group",
+} as const;
+
+/** "Sign in to start {personality}'s group", or a plain line when no reel is on this device. */
+export function signInToStartLine(personality: string | null | undefined): string {
+  const p = (personality ?? "").trim();
+  return p ? `Sign in to start ${p}'s group.` : "Sign in to start your group.";
+}
+
 /** Group names run to 60 characters; past this, buttons say "your group" instead. */
 export const GROUP_NAME_BUTTON_MAX = 24;
 
@@ -62,6 +81,11 @@ export function teaserFormDisclosure(personality: string, hasTimeData: boolean |
   // Only an explicit true means real watch times; anything else leads with the exact title count
   const stat = hasTimeData !== true ? "how many titles you've watched" : "your total hours";
   return `Anyone with your code sees “${personality}” and ${stat}, even before they sign in. On by default; untick to keep it hidden.`;
+}
+
+/** Group page line for members who joined since this device last opened the group. */
+export function newSinceLastVisitLine(count: number): string {
+  return `New since your last visit: ${count} joined.`;
 }
 
 /** Absolute invite link. Codes are lowercase in URLs; joining accepts any case. */
@@ -133,3 +157,10 @@ export function createGroupErrorMessage(status: number): string {
   if (status === 400) return "That request got garbled on the way. Reload the page and try again.";
   return "Couldn't create the group. Check your connection and try again.";
 }
+
+/**
+ * A 2xx create that still isn't usable: the server warned (group made, stats not added), or the
+ * body has no id or code. Same rule as the reel's last slide.
+ */
+export const CREATE_GROUP_INCOMPLETE_MESSAGE =
+  "The group didn't finish setting up. Try again; if it keeps happening, reload the page.";

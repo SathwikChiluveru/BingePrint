@@ -4,10 +4,11 @@ import { useState, useCallback, useEffect, useRef, useSyncExternalStore } from "
 import Link from "next/link";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import type { WrappedStats } from "@/types";
+import { isPendingInviteFresh, useAutoplayedStore } from "@/lib/store";
 import { Slide1Intro } from "./slides/Slide1Intro";
 import { Slide2TotalHours } from "./slides/Slide2TotalHours";
 import { Slide3TopShow } from "./slides/Slide3TopShow";
-import { Slide4TopShows } from "./slides/Slide4TopShows";
+import { Slide4TopShows, topShowsShare } from "./slides/Slide4TopShows";
 import { Slide5BingeBeast } from "./slides/Slide5BingeBeast";
 import { Slide6NightOwl } from "./slides/Slide6NightOwl";
 import { Slide7DayHeatmap } from "./slides/Slide7DayHeatmap";
@@ -72,6 +73,95 @@ const SLIDE_TITLES = new Map<unknown, string>([
   [Slide8Personality, "Personality"],
   [Slide10Share, "Your card"],
 ]);
+
+const DAY_NAMES: Record<string, string> = {
+  Mon: "Monday",
+  Tue: "Tuesday",
+  Wed: "Wednesday",
+  Thu: "Thursday",
+  Fri: "Friday",
+  Sat: "Saturday",
+  Sun: "Sunday",
+};
+
+const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
+
+/**
+ * Each slide's hero in a few words, announced with its title ("Top five: 22% of everything you
+ * watched, slide 4 of 8"), so the live region carries the number and not just the slide's name.
+ * Estimates say "about"; null when the slide has no hero to state.
+ */
+function slideSummary(type: unknown, stats: WrappedStats): string | null {
+  const estimated = stats.hasTimeData !== true;
+  switch (type) {
+    case Slide2TotalHours: {
+      const titles = Number(stats.totalEpisodesEstimate) || 0;
+      const hours = Number(stats.totalHours) || 0;
+      if (titles <= 0 && hours <= 0) return null;
+      return estimated ? plural(titles, "title", "titles") : plural(hours, "hour", "hours");
+    }
+    case Slide3TopShow:
+      return stats.topShows?.[0]?.title ?? null;
+    case Slide4TopShows: {
+      const shows = (stats.topShows ?? []).slice(0, 5);
+      const units = estimated ? stats.totalEpisodesEstimate : (stats.distinctTitleDays ?? stats.totalEpisodesEstimate);
+      const share = topShowsShare(shows, units ?? 0);
+      return share > 0 ? `${share}% of everything you watched` : null;
+    }
+    case Slide5BingeBeast: {
+      const b = stats.longestBinge;
+      const seconds = b?.totalSeconds ?? 0;
+      if (!b || seconds <= 0) return null;
+      if (estimated) {
+        const count = b.titleCount ?? b.showCount ?? b.titles?.length ?? 0;
+        return count > 0 ? `${plural(count, "title", "titles")} in one day` : null;
+      }
+      const totalMins = Math.round(seconds / 60);
+      const h = Math.floor(totalMins / 60);
+      const m = totalMins % 60;
+      return `${plural(h, "hour", "hours")}${m > 0 ? ` ${plural(m, "minute", "minutes")}` : ""} straight`;
+    }
+    case Slide6NightOwl: {
+      const score = Number(stats.nightOwlScore);
+      return Number.isFinite(score) ? `${Math.max(0, Math.min(100, Math.round(score)))}% night owl` : null;
+    }
+    case Slide7DayHeatmap: {
+      const counts = stats.dayTitleCounts;
+      const days =
+        estimated && Array.isArray(counts) && counts.length > 0
+          ? counts.map((d) => ({ day: d.day, value: d.count }))
+          : (stats.dayHeatmap ?? []).map((d) => ({ day: d.day, value: d.hours }));
+      const peak = days.reduce<{ day: string; value: number } | null>((a, b) => (!a || b.value > a.value ? b : a), null);
+      return peak && peak.value > 0 ? `you live for ${DAY_NAMES[peak.day] ?? peak.day}s` : null;
+    }
+    case Slide9MostLoyal:
+      return stats.mostLoyalShow?.title ?? null;
+    case Slide8Personality:
+      return stats.personality?.trim() || null;
+    default:
+      return null;
+  }
+}
+
+// Set once a reel has reached its card, so a returning viewer gets "Skip to my card" on the intro.
+// localStorage: survives the tab closing. Storage can throw (private mode, blocked).
+const VIEWED_KEY_PREFIX = "autoplayed:viewed:";
+
+function readViewed(sessionId: string): boolean {
+  try {
+    return window.localStorage.getItem(VIEWED_KEY_PREFIX + sessionId) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeViewed(sessionId: string) {
+  try {
+    window.localStorage.setItem(VIEWED_KEY_PREFIX + sessionId, "1");
+  } catch {
+    // Storage unavailable: no skip link next time.
+  }
+}
 
 // Current slide per reel, so a reload or an app switch resumes where the viewer was.
 // sessionStorage: per tab, gone when the tab closes. Storage can throw (private mode, blocked).
@@ -184,6 +274,21 @@ export function SlideShow({ stats, sessionId }: Props) {
   useEffect(() => {
     writeStoredSlide(sessionId, current);
   }, [sessionId, current]);
+
+  // Read once per mount: a viewer who reaches the card this visit doesn't see the skip until next time.
+  const [viewedBefore] = useState(() => readViewed(sessionId));
+  useEffect(() => {
+    if (current === totalSlides - 1) writeViewed(sessionId);
+  }, [sessionId, current, totalSlides]);
+
+  // An invite the viewer arrived through (same test as Slide10Share): the intro tells them their
+  // group waits at the end. Not on an empty reel, whose card has no group step.
+  const pendingInvite = useAutoplayedStore((s) => s.pendingInvite);
+  const myGroup = useAutoplayedStore((s) => s.myGroup);
+  const waitingGroup =
+    !emptyReel && isPendingInviteFresh(pendingInvite) && pendingInvite.code !== myGroup?.inviteCode
+      ? pendingInvite.groupName?.trim() || "Your group"
+      : null;
 
   const sectionRef = useRef<HTMLElement>(null);
   // Set by goTo, consumed by the focus effect after the new slide commits.
@@ -331,6 +436,7 @@ export function SlideShow({ stats, sessionId }: Props) {
 
   const position = `${current + 1} of ${totalSlides}`;
   const title = SLIDE_TITLES.get(slides[current].type) ?? "Slide";
+  const summary = slideSummary(slides[current].type, stats);
   // The share slide is the screenshot frame: no dots over it, and the exit
   // button only on desktop (md+), where it sits clear of the narrow card.
   const isLast = current === totalSlides - 1;
@@ -385,13 +491,21 @@ export function SlideShow({ stats, sessionId }: Props) {
               onPointerCancel={onPointerCancel}
               onClick={onSlideClick}
             >
-              {slides[current]}
+              {current === 0 ? (
+                <Slide1Intro
+                  stats={stats}
+                  waitingGroup={waitingGroup}
+                  onSkipToCard={viewedBefore && totalSlides > 2 ? () => goTo(totalSlides - 1, "button") : undefined}
+                />
+              ) : (
+                slides[current]
+              )}
             </div>
           </motion.div>
         </AnimatePresence>
 
         <p className="sr-only" aria-live="polite" aria-atomic="true">
-          {title}, slide {position}
+          {summary ? `${title}: ${summary}` : title}, slide {position}
         </p>
 
         {/*

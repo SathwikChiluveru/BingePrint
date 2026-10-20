@@ -1,32 +1,8 @@
 /*
-  Landing-only surfaces. Scoped here (not in tokens) because they are landing exceptions:
-  the landing frames keep the One Red Thing on the CTA, so their glow is neutral, not red.
+  Landing-only surfaces, scoped here (not in tokens) because only the sample reel uses them.
 */
 
-/* Neutral light behind the sample reel and the finale: Marquee White at 6%, fading by 70% */
-.neutralGlow {
-  background: radial-gradient(
-    ellipse 60% 50% at 50% 50%,
-    color-mix(in srgb, var(--color-text) 6%, transparent) 0%,
-    transparent 70%
-  );
-}
-
-.dropzone {
-  border: 2px dashed var(--color-border-strong);
-  background: color-mix(in srgb, var(--color-surface) 85%, transparent);
-}
-
-.dropzone:hover {
-  border-color: color-mix(in srgb, var(--color-text) 32%, transparent);
-}
-
-.dropzone[data-dragging] {
-  border-color: var(--color-red);
-  background: var(--color-red-subtle);
-}
-
-/* The reel's glass face: Screening Room at 72% so the neutral glow reads through the blur */
+/* The reel's glass face: Screening Room at 72% so the hero's red glow reads through the blur */
 .reelFace {
   background: color-mix(in srgb, var(--color-bg) 72%, transparent);
   backdrop-filter: blur(24px);

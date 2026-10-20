@@ -12,6 +12,8 @@ import InviteFrame, { InAppInvite, NetflixFileSteps, useInAppBrowser } from "@/c
 import MyGroupsList from "@/components/groups/MyGroupsList";
 import { toGroupSummary } from "@/lib/share/safety";
 import {
+  CREATE_GROUP_INCOMPLETE_MESSAGE,
+  GROUP_ACTIONS,
   INVITE_ACTIONS,
   INVITE_CODE_FORMAT_ERROR,
   JOIN_ACTIONS,
@@ -273,9 +275,30 @@ function GroupsContent() {
       return;
     }
 
-    const group = await res.json();
+    const group: { id?: unknown; invite_code?: unknown; name?: unknown; warning?: unknown } | null = await res
+      .json()
+      .catch(() => null);
+    // A "created but your stats weren't added" warning, or a body without an id or code, is a
+    // failure (same rule as the reel's last slide): nothing is stored and the form stays up
+    if (
+      !group ||
+      group.warning ||
+      typeof group.id !== "string" ||
+      !group.id ||
+      typeof group.invite_code !== "string" ||
+      !group.invite_code
+    ) {
+      setLoading(false);
+      setError(CREATE_GROUP_INCOMPLETE_MESSAGE);
+      return;
+    }
     // setMyGroup stamps the current reel's sessionId, so a later upload can tell the group is stale
-    setMyGroup({ id: group.id, inviteCode: group.invite_code, name: group.name, ownedByMe: true });
+    setMyGroup({
+      id: group.id,
+      inviteCode: group.invite_code,
+      name: typeof group.name === "string" && group.name ? group.name : name,
+      ownedByMe: true,
+    });
     router.push(`/groups/${encodeURIComponent(group.id)}`);
   }
 
@@ -357,7 +380,7 @@ function GroupsContent() {
           <div className="mt-10 divide-y divide-[var(--color-border)] border-y border-[var(--color-border)]">
             <div className="py-5">
               <button onClick={() => goTo("create")} className="btn-primary w-full py-4 text-lg">
-                Start a group
+                {GROUP_ACTIONS.startMyGroup}
                 <ArrowRightIcon />
               </button>
               <p className="mt-2 text-sm" style={{ color: "var(--color-muted)" }}>
@@ -366,7 +389,7 @@ function GroupsContent() {
             </div>
             <div className="py-5">
               <button onClick={() => goTo("join")} className="btn-secondary w-full py-4 text-lg">
-                Join with a code
+                {GROUP_ACTIONS.joinWithCode}
               </button>
               <p className="mt-2 text-sm" style={{ color: "var(--color-muted)" }}>
                 A friend sent you a code? This is where it goes.

@@ -9,6 +9,7 @@ export const contentType = "image/png";
 
 /** Shared link preview: one sample reel frame, labeled as a sample. */
 // Fonts: Inter (SIL OFL, see src/app/fonts/OFL.txt) read from disk, so the hero gets a true black weight.
+// Named exception in DESIGN.md (Typography): the renderer has no system sans, so link previews use Inter.
 export default async function Image() {
   const [interBlack, interSemiBold] = await Promise.all([
     readFile(join(process.cwd(), "src/app/fonts/Inter-900.ttf")),

@@ -35,7 +35,7 @@ function Hours({ totalSeconds, estimated }: { totalSeconds: number; estimated: b
 }
 
 /** Share of every title watched that went to the top list (0 when it cannot be computed). */
-function topShowsShare(shows: ShowStat[], totalTitles: number): number {
+export function topShowsShare(shows: ShowStat[], totalTitles: number): number {
   if (totalTitles <= 0) return 0;
   const watched = shows.reduce((s, x) => s + x.watchCount, 0);
   return Math.min(100, Math.round((watched / totalTitles) * 100));

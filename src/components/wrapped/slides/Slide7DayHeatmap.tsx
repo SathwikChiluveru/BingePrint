@@ -34,9 +34,12 @@ interface DayValue {
   value: number;
 }
 
-/** Splits hours into a hero value and unit: 832.3 -> ["832", "h"], 1.4 -> ["1.4", "h"], 0.5 -> ["30", "m"]. */
-function splitHours(hours: number): [string, "h" | "m"] {
-  if (hours >= 10) return [Math.round(hours).toLocaleString(), "h"];
+/**
+ * Splits hours into a hero value and unit: 832.3 -> ["832", "h"], 1.4 -> ["1.4", "h"], 0.5 -> ["30", "m"].
+ * Estimates ("~") never carry a decimal: 1.4 -> ["1", "h"], so the hedge is not undercut by false precision.
+ */
+function splitHours(hours: number, estimated = false): [string, "h" | "m"] {
+  if (hours >= 10 || (estimated && hours >= 0.95)) return [Math.max(1, Math.round(hours)).toLocaleString(), "h"];
   if (hours >= 1) {
     return [hours.toLocaleString(undefined, { maximumFractionDigits: 1 }), "h"];
   }
@@ -55,7 +58,7 @@ function Approx({ show }: { show: boolean }) {
 }
 
 function HoursText({ hours, estimated }: { hours: number; estimated: boolean }) {
-  const [value, unit] = splitHours(hours);
+  const [value, unit] = splitHours(hours, estimated);
   return (
     <>
       <Approx show={estimated} />
@@ -105,7 +108,7 @@ export function Slide7DayHeatmap({ stats }: Props) {
 
   // dayHeatmap hours are all-time totals per weekday, which is the striking number, so it leads.
   // The weekly average is secondary; older stored stats lack weeksSpanned and skip it.
-  const [hoursValue, hoursUnit] = splitHours(peakHours);
+  const [hoursValue, hoursUnit] = splitHours(peakHours, estimated);
   const heroText = countMode ? (peakDay?.value ?? 0).toLocaleString() : hoursValue;
   // Visible characters: digits plus the "~" and unit for estimated hours.
   const heroLength = heroText.length + (countMode ? 0 : 1 + (estimated ? 1 : 0));
@@ -192,7 +195,9 @@ export function Slide7DayHeatmap({ stats }: Props) {
                 {DAY_NAMES[d.day] ?? d.day}:{" "}
                 {countMode
                   ? `${d.value.toLocaleString()} ${d.value === 1 ? "title" : "titles"} all-time`
-                  : `${estimated ? "about " : ""}${d.value.toLocaleString(undefined, { maximumFractionDigits: 1 })} hours all-time`}
+                  : estimated
+                    ? `about ${Math.round(d.value).toLocaleString()} ${Math.round(d.value) === 1 ? "hour" : "hours"} all-time`
+                    : `${d.value.toLocaleString(undefined, { maximumFractionDigits: 1 })} hours all-time`}
               </li>
             ))}
           </ul>
@@ -200,17 +205,23 @@ export function Slide7DayHeatmap({ stats }: Props) {
           {/* Supporting bars: neutral, peak a brighter neutral, so the hero stays the only red */}
           <div className="mt-8 short:mt-5 flex items-end gap-3 w-full max-w-sm h-32 short:h-20 px-2" aria-hidden="true">
             {days.map((d, i) => {
-              const heightPct = Math.max((d.value / maxValue) * 100, 4);
               const isPeak = d.day === peakDay.day;
+              // A weekday with nothing on it is an empty track (a hairline), never a filled stub
+              const empty = d.value <= 0;
+              const heightPct = empty ? 0 : Math.max((d.value / maxValue) * 100, 4);
 
               return (
                 <div key={d.day} className="flex-1 h-full flex flex-col items-center justify-end gap-2">
                   <motion.div
-                    className="w-full rounded-t-lg"
-                    style={{
-                      background: isPeak ? "var(--color-track-strong)" : "var(--color-surface-2)",
-                      border: `1px solid ${isPeak ? "transparent" : "var(--color-border)"}`,
-                    }}
+                    className={empty ? "w-full" : "w-full rounded-t-lg"}
+                    style={
+                      empty
+                        ? { borderTop: "1px solid var(--color-border-strong)" }
+                        : {
+                            background: isPeak ? "var(--color-track-strong)" : "var(--color-surface-2)",
+                            border: `1px solid ${isPeak ? "transparent" : "var(--color-border)"}`,
+                          }
+                    }
                     initial={reduce ? false : { height: "0%" }}
                     animate={{ height: `${heightPct}%` }}
                     transition={{ delay: 0.55 + i * 0.06, duration: 0.5, ease: EASE_SMOOTH }}

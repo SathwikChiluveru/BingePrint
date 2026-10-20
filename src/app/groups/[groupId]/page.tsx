@@ -25,6 +25,7 @@ import {
   JOIN_ACTIONS,
   addReelToLabel,
   groupNameForButton,
+  newSinceLastVisitLine,
   updateStatsLabel,
   uploadWithInviteHref,
 } from "@/lib/copy/invite";
@@ -67,6 +68,29 @@ function updateErrorMessage(status: number) {
   if (status === 413 || status === 422) return "Your stats couldn't be read. Upload your file again.";
   if (status === 429) return "Too many updates. Wait a minute, then try again.";
   return "Couldn't update your stats. Your old stats are still there. Try again.";
+}
+
+// Member count this device saw on its last visit, per group. Local only: there are no join
+// notifications, so this is how a returning member learns friends joined. Storage can be blocked
+// (private mode, cleared data), so every access is wrapped and a miss just shows nothing.
+const seenKey = (groupId: string) => `autoplayed:group-seen:${groupId}`;
+
+function readSeenCount(groupId: string): number | null {
+  try {
+    const raw = window.localStorage.getItem(seenKey(groupId));
+    const n = raw === null ? NaN : Number(raw);
+    return Number.isInteger(n) && n >= 0 ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeSeenCount(groupId: string, count: number) {
+  try {
+    window.localStorage.setItem(seenKey(groupId), String(count));
+  } catch {
+    // Storage unavailable: the line just won't appear next time
+  }
 }
 
 type AuthUser = { id: string; email?: string | null; user_metadata?: Record<string, unknown> | null };
@@ -120,6 +144,8 @@ function GroupDetail() {
   const [error, setError] = useState("");
   const [updating, setUpdating] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<{ ok: boolean; text: string } | null>(null);
+  // Members who joined since this device last opened the group (0 = say nothing)
+  const [joinedSinceVisit, setJoinedSinceVisit] = useState(0);
   const autoUpdateStarted = useRef(false);
 
   const wrappedStats = useAutoplayedStore((s) => s.wrappedStats);
@@ -173,6 +199,18 @@ function GroupDetail() {
         }
         setLoadError(null);
         setGroup(data);
+        // Compare with the last visit before the effect below records this one. Only the member
+        // view of a member has the real list (RLS hides it from non-members); the first visit sets
+        // the baseline and says nothing.
+        if (
+          !data.preview &&
+          Array.isArray(data.members) &&
+          !!authUser &&
+          data.members.some((m: GroupMember) => m.user_id === authUser.id)
+        ) {
+          const seen = readSeenCount(groupId);
+          if (seen !== null && data.members.length > seen) setJoinedSinceVisit(data.members.length - seen);
+        }
         // The preview's own CTA leads; a member-view non-member (an owner who never added their
         // reel) gets the form straight away when they came for it
         if (
@@ -203,6 +241,12 @@ function GroupDetail() {
 
   const members: GroupMember[] = useMemo(() => group?.members ?? [], [group]);
   const standings = useMemo(() => rankMembers(members, user?.id ?? null), [members, user]);
+
+  // Record what this device has now seen as a member, including the viewer's own join
+  const seenAsMember = !!group && group.preview !== true && !!user && members.some((m) => m.user_id === user.id);
+  useEffect(() => {
+    if (seenAsMember) writeSeenCount(groupId, members.length);
+  }, [groupId, seenAsMember, members.length]);
 
   function retryLoad() {
     setLoading(true);
@@ -645,8 +689,25 @@ function GroupDetail() {
   }
 
   // ---------- Member view ----------
+  // At most one banner under the header, by priority: an update in progress (or its result) >
+  // the "you're in" confirmation > an owner adding their reel > a reel that no longer matches
+  const banner: "update" | "joined" | "add" | "outdated" | null = autoUpdate
+    ? "update"
+    : joinedAlone && isMember
+      ? "joined"
+      : !isMember
+        ? "add"
+        : statsOutdated || updateStatus
+          ? "outdated"
+          : null;
+  // A member alone in a fresh group has one job, getting it shared, so the invite leads; in every
+  // other state (including an owner off the board) it sits below the standings
+  const inviteLeads = isFresh && isMember;
+  // Display size for names that fit in a button; longer names (up to 60) step down so they wrap well
+  const nameFitsDisplay = buttonGroupName === group.name.trim();
+
   const inviteBlock = (
-    <section aria-labelledby="invite-heading" className={isFresh ? "mb-12" : "mt-12"}>
+    <section aria-labelledby="invite-heading" className={inviteLeads ? "mb-12" : "mt-12"}>
       <h2
         id="invite-heading"
         className={isFresh ? "text-title font-semibold" : "text-base font-semibold"}
@@ -705,25 +766,40 @@ function GroupDetail() {
   );
 
   return (
-    <main className="min-h-screen px-6 py-10" style={{ background: "var(--color-bg)" }}>
+    <main className="min-h-screen px-6 py-10 overflow-x-clip" style={{ background: "var(--color-bg)" }}>
       <div className="max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
+        {/* Header: the group's name lands like a reel hero, over the screening-room glow */}
+        <header className="mb-10">
           <Link
             href={backHref}
-            className="inline-flex items-center gap-2 min-h-[44px] pr-3 text-sm mb-2 transition-colors hover:text-[var(--color-text)]"
+            className="inline-flex items-center gap-2 min-h-[44px] pr-3 text-sm mb-4 transition-colors hover:text-[var(--color-text)]"
             style={{ color: "var(--color-text-secondary)" }}
           >
             <ArrowLeftIcon size={16} />
             {backLabel}
           </Link>
-          <h1 className="text-headline font-black break-words [overflow-wrap:anywhere]" style={{ color: "var(--color-text)" }}>
-            {group.name}
-          </h1>
-        </div>
+          <div className="relative isolate">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -inset-x-16 -inset-y-14 -z-10"
+              style={{ background: "var(--glow-hero)" }}
+            />
+            <h1
+              className={`${nameFitsDisplay ? "text-display" : "text-headline"} font-black [overflow-wrap:anywhere]`}
+              style={{ color: "var(--color-text)", textWrap: "balance" }}
+            >
+              {group.name}
+            </h1>
+          </div>
+          {joinedSinceVisit > 0 && (
+            <p role="status" className="mt-4 text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>
+              {newSinceLastVisitLine(joinedSinceVisit)}
+            </p>
+          )}
+        </header>
 
         {/* Arrived from the reel's "Update my stats": progress, then the result, at the top */}
-        {autoUpdate && (
+        {banner === "update" && (
           <div className="mb-6">
             {updating || (!updateStatus && statsOutdated) ? (
               <p role="status" style={{ color: "var(--color-text-secondary)" }}>
@@ -754,7 +830,7 @@ function GroupDetail() {
         )}
 
         {/* Joined, but nobody to compare against yet: confirm, then the invite leads */}
-        {joinedAlone && isMember && (
+        {banner === "joined" && (
           <div role="status" className="mb-6 flex items-start gap-3">
             <span
               aria-hidden="true"
@@ -773,7 +849,7 @@ function GroupDetail() {
         )}
 
         {/* An owner who isn't on the board: adding their reel is the one red action */}
-        {!isMember && (
+        {banner === "add" && (
           <section className="mb-10">
             {showJoinForm ? (
               joinPanel
@@ -789,8 +865,37 @@ function GroupDetail() {
           </section>
         )}
 
-        {/* A fresh group's job is to get shared, so the invite leads */}
-        {isFresh && inviteBlock}
+        {/* The reel on this device isn't the one the group sees */}
+        {banner === "outdated" && (
+          <div className="mb-8 flex flex-col gap-2">
+            {statsOutdated && (
+              <>
+                <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+                  Your reel on this device doesn&apos;t match your spot here.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleUpdateStats}
+                  disabled={updating}
+                  className="btn-secondary self-start px-5 py-3"
+                >
+                  {updating ? "Updating…" : updateStatsLabel(group.name)}
+                </button>
+              </>
+            )}
+            <p
+              aria-live="polite"
+              role={updateStatus && !updateStatus.ok ? "alert" : undefined}
+              className="text-sm min-h-[1.25rem]"
+              style={{ color: updateStatus && !updateStatus.ok ? "var(--color-red-text)" : "var(--color-success)" }}
+            >
+              {updateStatus?.text ?? ""}
+            </p>
+          </div>
+        )}
+
+        {/* A member alone in a fresh group: getting it shared is the job, so the invite leads */}
+        {inviteLeads && inviteBlock}
 
         {/* Members as ranked roast rows (hidden from non-members: RLS returns none to them) */}
         <section aria-labelledby="members-heading">
@@ -821,38 +926,9 @@ function GroupDetail() {
               Comparing unlocks when a second person joins.
             </p>
           )}
-
-          {/* The reel on this device isn't the one the group sees */}
-          {!autoUpdate && (statsOutdated || updateStatus) && (
-            <div className="mt-6 flex flex-col gap-2">
-              {statsOutdated && (
-                <>
-                  <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-                    Your reel on this device doesn&apos;t match your spot here.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleUpdateStats}
-                    disabled={updating}
-                    className="btn-secondary self-start px-5 py-3"
-                  >
-                    {updating ? "Updating…" : updateStatsLabel(group.name)}
-                  </button>
-                </>
-              )}
-              <p
-                aria-live="polite"
-                role={updateStatus && !updateStatus.ok ? "alert" : undefined}
-                className="text-sm min-h-[1.25rem]"
-                style={{ color: updateStatus && !updateStatus.ok ? "var(--color-red-text)" : "var(--color-success)" }}
-              >
-                {updateStatus?.text ?? ""}
-              </p>
-            </div>
-          )}
         </section>
 
-        {!isFresh && inviteBlock}
+        {!inviteLeads && inviteBlock}
       </div>
     </main>
   );
