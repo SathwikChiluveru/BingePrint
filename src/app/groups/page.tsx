@@ -11,6 +11,7 @@ import { suggestGroupName, suggestNickname } from "@/components/groups/memberSta
 import InviteFrame, { InAppInvite, NetflixFileSteps, useInAppBrowser } from "@/components/groups/InviteFrame";
 import MyGroupsList from "@/components/groups/MyGroupsList";
 import InviteCodeChip from "@/components/groups/InviteCodeChip";
+import AppNav from "@/components/AppNav";
 import { toGroupSummary } from "@/lib/share/safety";
 import {
   CREATE_GROUP_INCOMPLETE_MESSAGE,
@@ -81,23 +82,15 @@ function BackButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-// Wordmark home, then one column. Each mode brings its own heading; no generic page title.
+// The shared bar, then one column. Each mode brings its own heading; no generic page title.
 function PageShell({ children, wide = false }: { children: React.ReactNode; wide?: boolean }) {
   return (
-    <main className="min-h-screen flex flex-col px-6 pt-3 pb-12" style={{ background: "var(--color-bg)" }}>
-      <div className={`w-full mx-auto ${wide ? "max-w-xl" : "max-w-md"}`}>
-        <Link
-          href="/"
-          className="-ml-2 inline-flex items-center min-h-[44px] px-2 text-lg font-black"
-          style={{ color: "var(--color-text)" }}
-        >
-          Autoplayed
-        </Link>
-      </div>
-      <div className={`w-full mx-auto flex-1 flex flex-col justify-center py-8 ${wide ? "max-w-xl" : "max-w-md"}`}>
+    <div className="min-h-screen flex flex-col" style={{ background: "var(--color-bg)" }}>
+      <AppNav secondary={{ href: "/", label: "Back" }} />
+      <main className={`w-full mx-auto flex-1 flex flex-col justify-center px-6 py-8 pb-12 ${wide ? "max-w-xl" : "max-w-md"}`}>
         {children}
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
 
@@ -119,8 +112,12 @@ function GroupsContent() {
   const [mode, setMode] = useState<Mode>(() =>
     joinParam || badJoinParam ? "join" : modeParam === "create" ? "create" : modeParam === "join" ? "join" : "choose"
   );
-  // null = user hasn't typed yet, so the personality-based suggestion fills the field
-  const [typedName, setTypedName] = useState<string | null>(null);
+  // null = user hasn't typed yet, so the personality-based suggestion fills the field.
+  // A name typed before signing in rides through the login round trip as ?name=.
+  const [typedName, setTypedName] = useState<string | null>(() => searchParams.get("name")?.slice(0, 60) || null);
+  // null until the session check returns; signed-out visitors are sent to sign in before naming,
+  // never left to discover it from a 401 after typing
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
   // On by default, disclosed next to the checkbox (same default as the reel's one-tap create)
   const [shareTeaser, setShareTeaser] = useState(true);
   const [inviteCode, setInviteCode] = useState(joinParam);
@@ -207,6 +204,27 @@ function GroupsContent() {
     router.push(`/groups/${encodeURIComponent(group.id)}?code=${encodeURIComponent(code)}`);
   }
 
+  useEffect(() => {
+    let cancelled = false;
+    createClient()
+      .auth.getSession()
+      .then(({ data }) => {
+        if (!cancelled) setSignedIn(Boolean(data.session));
+      })
+      .catch(() => {
+        if (!cancelled) setSignedIn(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function signInToCreateHref(name?: string) {
+    const params = new URLSearchParams({ mode: "create" });
+    if (name) params.set("name", name);
+    return `/auth/login?next=${encodeURIComponent(`/groups?${params.toString()}`)}`;
+  }
+
   // Opened from an invite link: look the group up straight away
   useEffect(() => {
     if (!joinParam || autoJoinStarted.current) return;
@@ -227,6 +245,11 @@ function GroupsContent() {
     const {
       data: { session },
     } = await supabase.auth.getSession();
+    if (!session) {
+      // Sign in first; the typed name comes back with them
+      router.push(signInToCreateHref(name));
+      return;
+    }
 
     let res: Response;
     try {
@@ -261,7 +284,7 @@ function GroupsContent() {
           <>
             You need to sign in to create a group.{" "}
             <Link
-              href={`/auth/login?next=${encodeURIComponent("/groups?mode=create")}`}
+              href={signInToCreateHref(name)}
               className="underline underline-offset-2 font-semibold"
             >
               Sign in
@@ -379,12 +402,22 @@ function GroupsContent() {
           </p>
           <div className="mt-10 divide-y divide-[var(--color-border)] border-y border-[var(--color-border)]">
             <div className="py-5">
-              <button onClick={() => goTo("create")} className="btn-primary w-full py-4 text-lg">
-                {GROUP_ACTIONS.startMyGroup}
-                <ArrowRightIcon />
-              </button>
+              {signedIn === false ? (
+                // Same label as the reel's last slide for the same signed-out state
+                <Link href={signInToCreateHref()} className="btn-primary w-full py-4 text-lg">
+                  {GROUP_ACTIONS.signInAndStart}
+                  <ArrowRightIcon />
+                </Link>
+              ) : (
+                <button onClick={() => goTo("create")} className="btn-primary w-full py-4 text-lg">
+                  {GROUP_ACTIONS.startMyGroup}
+                  <ArrowRightIcon />
+                </button>
+              )}
               <p className="mt-2 text-sm" style={{ color: "var(--color-muted)" }}>
-                You get a code to send your friends. Only your stats go in, never your file.
+                {signedIn === false
+                  ? "A quick sign-in keeps the group yours. Then you get a code to send your friends."
+                  : "You get a code to send your friends. Only your stats go in, never your file."}
               </p>
             </div>
             <div className="py-5">
@@ -459,7 +492,7 @@ function GroupsContent() {
           </p>
           {error && <ErrorBox>{error}</ErrorBox>}
           <button type="submit" disabled={loading || !groupName.trim()} className="btn-primary py-3">
-            {loading ? "Starting…" : INVITE_ACTIONS.startGroup}
+            {loading ? "Starting…" : signedIn === false ? GROUP_ACTIONS.signInAndStart : INVITE_ACTIONS.startGroup}
             {!loading && <ArrowRightIcon />}
           </button>
           <BackButton onClick={() => goTo("choose")} />

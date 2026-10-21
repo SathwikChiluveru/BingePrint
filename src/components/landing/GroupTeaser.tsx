@@ -53,15 +53,16 @@ function StatBars({ label, statKey, unit }: { label: string; statKey: "titles" |
                 className="mt-1.5 h-2 overflow-hidden rounded-full"
                 style={{ background: "var(--color-track)" }}
               >
-                {/* Bars start partly drawn so they read before hydration, then grow to their value */}
+                {/* Bars render at their true length from the first paint (a pre-scroll capture or a
+                    link unfurl must never show a chart that contradicts its numbers); they only brighten in */}
                 <motion.div
-                  className="h-full origin-left rounded-full"
+                  className="h-full rounded-full"
                   style={{
                     width: `${(value / max) * 100}%`,
                     background: leader ? "var(--color-track-strong)" : "var(--color-border-strong)",
                   }}
-                  initial={{ scaleX: 0.4 }}
-                  whileInView={{ scaleX: 1 }}
+                  initial={{ opacity: 0.45 }}
+                  whileInView={{ opacity: 1 }}
                   viewport={{ once: true, margin: "0px 0px -15% 0px" }}
                   transition={{ duration: 0.6, ease: SMOOTH }}
                 />
@@ -97,7 +98,15 @@ export function GroupTeaser() {
               </Link>
             </div>
             <p className="mt-3 text-sm" style={{ color: "var(--color-muted)" }}>
-              Starting one? It&apos;s the last slide of your reel. Groups need a quick sign-in; your reel doesn&apos;t.
+              Starting one?{" "}
+              <Link
+                href="/upload"
+                className="-my-3 inline-block py-3 font-semibold underline underline-offset-4 hover:text-white"
+                style={{ color: "var(--color-text)" }}
+              >
+                Get your reel first
+              </Link>
+              ; its last slide starts the group. Groups need a quick sign-in, your reel doesn&apos;t.
             </p>
           </div>
 

@@ -28,6 +28,18 @@ typography:
     fontWeight: 900
     lineHeight: 0.95
     letterSpacing: "-0.05em"
+  personality-climax:
+    fontFamily: "-apple-system, BlinkMacSystemFont, \"SF Pro Display\", \"Segoe UI\", system-ui, sans-serif"
+    fontSize: "clamp(3.5rem, 15vw, 6.5rem)"
+    fontWeight: 900
+    lineHeight: 0.92
+    letterSpacing: "-0.04em"
+  invite-group-name:
+    fontFamily: "-apple-system, BlinkMacSystemFont, \"SF Pro Display\", \"Segoe UI\", system-ui, sans-serif"
+    fontSize: "clamp(2.5rem, 10vw, 4.5rem)"
+    fontWeight: 900
+    lineHeight: 0.95
+    letterSpacing: "-0.03em"
   display:
     fontFamily: "-apple-system, BlinkMacSystemFont, \"SF Pro Display\", \"Segoe UI\", system-ui, sans-serif"
     fontSize: "clamp(3rem, 8vw, 4.5rem)"

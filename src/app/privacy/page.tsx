@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import AppNav from "@/components/AppNav";
 
 export const metadata: Metadata = {
   title: "Privacy · Autoplayed",
@@ -7,9 +8,9 @@ export const metadata: Metadata = {
     "What Autoplayed keeps, where, and who can see it. Your Netflix file is read in your browser and never uploaded.",
 };
 
-// TODO(owner): replace with a real inbox you check before launch. Deletion requests go here
-// because there is no in-app "delete group" or "delete account" button yet ("Leave" exists).
-const CONTACT_EMAIL = "privacy@example.com";
+// Deletion requests go here because there is no in-app "delete group" or "delete account"
+// button yet ("Leave" exists).
+const CONTACT_EMAIL = "sathwikchiluveru@gmail.com";
 
 const LAST_UPDATED = "2026-10-20";
 const LAST_UPDATED_LABEL = "20 October 2026";
@@ -42,25 +43,7 @@ function Strong({ children }: { children: React.ReactNode }) {
 export default function PrivacyPage() {
   return (
     <div className="flex min-h-screen flex-col" style={{ background: "var(--color-bg)" }}>
-      <header
-        style={{
-          background: "var(--color-bg-translucent)",
-          borderBottom: "1px solid var(--color-border)",
-        }}
-      >
-        <nav className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-2 sm:px-6" aria-label="Main">
-          <Link
-            href="/"
-            className="inline-flex min-h-11 items-center text-xl font-black"
-            style={{ color: "var(--color-text)", letterSpacing: "-0.02em" }}
-          >
-            Autoplayed
-          </Link>
-          <Link href="/upload" className="btn-secondary px-4 text-sm">
-            Get my reel
-          </Link>
-        </nav>
-      </header>
+      <AppNav secondary={{ href: "/", label: "Back" }} />
 
       <main className="flex-1 px-4 pt-12 pb-20 sm:px-6 sm:pt-16">
         <article className="mx-auto max-w-[65ch] leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>

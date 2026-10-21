@@ -141,7 +141,7 @@ export function ShareCard({ stats, inviteCode, ownedByMe, groupName }: ShareCard
 
           {roast && (
             <p
-              className="mt-3 text-sm leading-snug line-clamp-3 short:mt-2 short:line-clamp-1"
+              className="mt-3 text-sm leading-snug line-clamp-3 short:hidden"
               style={{ color: "var(--color-text-secondary)", textWrap: "pretty" }}
             >
               {roast}

@@ -46,19 +46,20 @@ function ReelArtifact() {
     <div className="w-full">
       <div className="flex items-center justify-center gap-3" aria-hidden="true">
         {frames.map((f) => (
-          <div key={f.label} className="relative isolate w-[46%] max-w-[7.5rem]">
+          <div key={f.label} className="relative isolate w-[48%] max-w-[10rem]">
             {f.active && (
               <div
                 className="pointer-events-none absolute inset-[-45%] -z-10 opacity-70"
                 style={{ background: "var(--glow-hero)" }}
               />
             )}
+            {/* The inactive frame steps back by scale and surface only; never by opacity, which
+                dropped its label below 4.5:1 */}
             <div
               className="flex aspect-[9/16] w-full flex-col items-center justify-center rounded-[24px] px-2 text-center"
               style={{
                 background: f.active ? "var(--color-bg)" : "var(--color-surface)",
                 border: `1px solid ${f.active ? "var(--color-border-strong)" : "var(--color-border)"}`,
-                opacity: f.active ? 1 : 0.7,
                 transform: f.active ? undefined : "scale(0.9)",
               }}
             >
@@ -69,8 +70,11 @@ function ReelArtifact() {
                 {f.label}
               </span>
               <span
-                className={`mt-1 font-black ${f.kind === "number" ? "text-xl tabular-nums" : "text-lg leading-tight"}`}
-                style={{ letterSpacing: "-0.03em" }}
+                className={`mt-1 font-black ${f.kind === "number" ? "text-3xl tabular-nums" : "text-2xl leading-tight"}`}
+                style={{
+                  letterSpacing: "-0.03em",
+                  color: f.active ? "var(--color-text)" : "var(--color-text-secondary)",
+                }}
               >
                 {f.value}
               </span>
@@ -146,8 +150,8 @@ const steps: Step[] = [
     title: "Challenge your group",
     body: (
       <>
-        Start a group and drop the code in the chat. Everyone&apos;s stats land side by side. Groups need a quick
-        sign-in. The group sees your name, stats and personality, never the file.
+        Start a group and drop the code in the chat. Everyone&apos;s stats land side by side. The group sees your
+        name, stats and personality, never the file.
       </>
     ),
     artifact: <InviteArtifact />,
@@ -165,7 +169,8 @@ export function HowItWorks() {
         {steps.map((step, i) => (
           <li
             key={step.title}
-            className="grid gap-6 py-8 md:grid-cols-[3rem_minmax(0,1fr)_18rem] md:items-center md:gap-10 md:py-10"
+            // Top-aligned rows: the numeral sits on the title's line, never centred on a row the artifact makes taller
+            className="grid gap-6 py-8 md:grid-cols-[3rem_minmax(0,1fr)_18rem] md:items-start md:gap-10 md:py-10"
             style={{ borderBottom: "1px solid var(--color-border)" }}
           >
             <span

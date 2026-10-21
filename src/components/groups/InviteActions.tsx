@@ -32,13 +32,21 @@ interface InviteActionsProps {
   sharePrimary?: boolean;
   /** The card says "Join my group" for the creator, "Join our group" for everyone else */
   ownedByMe?: boolean;
+  /** Copy code only: for pages whose own share action already carries the code (compare) */
+  copyOnly?: boolean;
 }
 
 type Status = { tone: "ok" | "error"; text: string } | null;
 // The card is built ahead of the click so navigator.share runs inside the tap (iOS needs that)
 type Card = { kind: "pending" } | { kind: "ready"; file: File } | { kind: "failed" };
 
-export default function InviteActions({ code, groupName, sharePrimary = false, ownedByMe = false }: InviteActionsProps) {
+export default function InviteActions({
+  code,
+  groupName,
+  sharePrimary = false,
+  ownedByMe = false,
+  copyOnly = false,
+}: InviteActionsProps) {
   const wrappedStats = useAutoplayedStore((s) => s.wrappedStats);
   const [status, setStatus] = useState<Status>(null);
   const [card, setCard] = useState<Card>({ kind: "pending" });
@@ -49,7 +57,7 @@ export default function InviteActions({ code, groupName, sharePrimary = false, o
   }, []);
 
   useEffect(() => {
-    if (!wrappedStats) return;
+    if (!wrappedStats || copyOnly) return;
     let cancelled = false;
     renderShareImage(wrappedStats, { inviteCode: code, ownedByMe })
       .then((blob) => {
@@ -62,7 +70,7 @@ export default function InviteActions({ code, groupName, sharePrimary = false, o
     return () => {
       cancelled = true;
     };
-  }, [wrappedStats, code, ownedByMe]);
+  }, [wrappedStats, code, ownedByMe, copyOnly]);
 
   function announce(next: Status) {
     setStatus(next);
@@ -146,15 +154,21 @@ export default function InviteActions({ code, groupName, sharePrimary = false, o
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col sm:flex-row gap-3">
+        {!copyOnly && (
+          <button
+            type="button"
+            onClick={share}
+            className={`${sharePrimary ? "btn-primary" : "btn-secondary"} flex-1 px-6 py-3`}
+          >
+            <UserPlusIcon />
+            {INVITE_ACTIONS.shareInvite}
+          </button>
+        )}
         <button
           type="button"
-          onClick={share}
-          className={`${sharePrimary ? "btn-primary" : "btn-secondary"} flex-1 px-6 py-3`}
+          onClick={copyCode}
+          className={`btn-secondary px-6 py-3 ${copyOnly ? "self-start" : "flex-1"}`}
         >
-          <UserPlusIcon />
-          {INVITE_ACTIONS.shareInvite}
-        </button>
-        <button type="button" onClick={copyCode} className="btn-secondary flex-1 px-6 py-3">
           {copied ? <CheckIcon /> : <CopyIcon />}
           {copied ? "Copied" : "Copy code"}
         </button>

@@ -130,7 +130,7 @@ export function Slide7DayHeatmap({ stats }: Props) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, ease: EASE_SMOOTH }}
           >
-            You live for {peakName}s
+            Your week
           </motion.p>
 
           <motion.div
@@ -203,17 +203,22 @@ export function Slide7DayHeatmap({ stats }: Props) {
           </ul>
 
           {/* Supporting bars: neutral, peak a brighter neutral, so the hero stays the only red */}
-          <div className="mt-8 short:mt-5 flex items-end gap-3 w-full max-w-sm h-32 short:h-20 px-2" aria-hidden="true">
-            {days.map((d, i) => {
-              const isPeak = d.day === peakDay.day;
-              // A weekday with nothing on it is an empty track (a hairline), never a filled stub
-              const empty = d.value <= 0;
-              const heightPct = empty ? 0 : Math.max((d.value / maxValue) * 100, 4);
+          {/*
+            Bars get their own track and the day labels their own row: sharing one flex column let
+            flex-shrink squeeze tall bars more than short ones, so "twice as many" drew as ~1.6x.
+          */}
+          <div className="mt-8 short:mt-5 w-full max-w-sm px-2" aria-hidden="true">
+            <div className="flex items-end gap-3 h-28 short:h-16">
+              {days.map((d, i) => {
+                const isPeak = d.day === peakDay.day;
+                // A weekday with nothing on it is an empty track (a hairline), never a filled stub
+                const empty = d.value <= 0;
+                const heightPct = empty ? 0 : Math.max((d.value / maxValue) * 100, 4);
 
-              return (
-                <div key={d.day} className="flex-1 h-full flex flex-col items-center justify-end gap-2">
+                return (
                   <motion.div
-                    className={empty ? "w-full" : "w-full rounded-t-lg"}
+                    key={d.day}
+                    className={empty ? "flex-1" : "flex-1 rounded-t-lg"}
                     style={
                       empty
                         ? { borderTop: "1px solid var(--color-border-strong)" }
@@ -226,15 +231,20 @@ export function Slide7DayHeatmap({ stats }: Props) {
                     animate={{ height: `${heightPct}%` }}
                     transition={{ delay: 0.55 + i * 0.06, duration: 0.5, ease: EASE_SMOOTH }}
                   />
-                  <span
-                    className="text-xs font-medium"
-                    style={{ color: isPeak ? "var(--color-text)" : "var(--color-muted)" }}
-                  >
-                    {d.day}
-                  </span>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+            <div className="flex gap-3 mt-2">
+              {days.map((d) => (
+                <span
+                  key={d.day}
+                  className="flex-1 text-center text-xs font-medium"
+                  style={{ color: d.day === peakDay.day ? "var(--color-text)" : "var(--color-muted)" }}
+                >
+                  {d.day}
+                </span>
+              ))}
+            </div>
           </div>
 
           {/* The roast lands under the chart, after the bars finish growing */}

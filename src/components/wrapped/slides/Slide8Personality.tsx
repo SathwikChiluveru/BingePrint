@@ -23,6 +23,10 @@ const heroWordStyle = {
   lineHeight: 0.92,
   letterSpacing: "-0.04em",
   textWrap: "balance",
+  // background-clip:text only paints inside the box, and 0.92 line-height leaves descenders
+  // ("g" in Binge) outside it. Pad the box down to cover them without moving the layout.
+  paddingBottom: "0.16em",
+  marginBottom: "-0.16em",
 } as const;
 
 /*
@@ -113,12 +117,12 @@ export function Slide8Personality({ stats }: Props) {
           initial={
             reduce
               ? { opacity: 0 }
-              : { opacity: 0, scale: 1.15, clipPath: "inset(-10% 100% -10% 0%)", filter: "blur(10px)" }
+              : { opacity: 0, scale: 1.15, clipPath: "inset(-20% 100% -20% 0%)", filter: "blur(10px)" }
           }
           animate={
             reduce
               ? { opacity: 1 }
-              : { opacity: 1, scale: 1, clipPath: "inset(-10% 0% -10% 0%)", filter: "blur(0px)" }
+              : { opacity: 1, scale: 1, clipPath: "inset(-20% 0% -20% 0%)", filter: "blur(0px)" }
           }
           transition={
             reduce

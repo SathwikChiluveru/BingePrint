@@ -4,6 +4,8 @@ import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import type { Group } from "@/types";
 import InviteActions from "@/components/groups/InviteActions";
+import InviteCodeChip from "@/components/groups/InviteCodeChip";
+import AppNav from "@/components/AppNav";
 import { JOIN_ACTIONS } from "@/lib/copy/invite";
 import { ArrowRightIcon, CheckIcon } from "@/components/groups/icons";
 import Approx from "./Approx";
@@ -34,6 +36,8 @@ export default function CompareView({
   const groupHref = `/groups/${encodeURIComponent(group.id)}`;
 
   return (
+    <>
+    <AppNav secondary={{ href: "/groups", label: "Your groups" }} />
     <main className="mx-auto min-h-screen w-full max-w-2xl px-4 pb-16 pt-3 sm:px-6">
       <BackLink groupId={group.id} label={group.name} />
 
@@ -149,10 +153,14 @@ export default function CompareView({
           Invite more
         </h2>
         <p className="mt-1 mb-4 text-sm text-[var(--color-text-secondary)]">
-          More people, more roasts. &ldquo;Share the invite&rdquo; sends just the link and the code.
+          More people, more roasts. The card above already carries the code, or send it on its own.
         </p>
-        <InviteActions code={group.invite_code} groupName={group.name} ownedByMe={ownedByMe} />
+        <div className="mb-4">
+          <InviteCodeChip code={group.invite_code} />
+        </div>
+        <InviteActions code={group.invite_code} groupName={group.name} ownedByMe={ownedByMe} copyOnly />
       </section>
     </main>
+    </>
   );
 }

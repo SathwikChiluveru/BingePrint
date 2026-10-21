@@ -9,6 +9,7 @@ import { forgetMyGroup, isPendingInviteFresh, useAutoplayedStore } from "@/lib/s
 import InviteActions from "@/components/groups/InviteActions";
 import InviteFrame, { InAppInvite, NetflixFileSteps, useInAppBrowser } from "@/components/groups/InviteFrame";
 import InviteCodeChip from "@/components/groups/InviteCodeChip";
+import AppNav from "@/components/AppNav";
 import InlineEdit, { type SaveResult } from "@/components/groups/InlineEdit";
 import LeaveGroup from "@/components/groups/LeaveGroup";
 import { ArrowLeftIcon, ArrowRightIcon, CheckIcon } from "@/components/groups/icons";
@@ -119,9 +120,10 @@ async function loadUser(): Promise<AuthUser | null> {
 
 function CenteredMain({ children }: { children: React.ReactNode }) {
   return (
-    <main className="min-h-screen flex items-center justify-center px-6" style={{ background: "var(--color-bg)" }}>
-      {children}
-    </main>
+    <div className="min-h-screen flex flex-col" style={{ background: "var(--color-bg)" }}>
+      <AppNav />
+      <main className="flex-1 flex items-center justify-center px-6 py-10">{children}</main>
+    </div>
   );
 }
 
@@ -548,6 +550,8 @@ function GroupDetail() {
   const hasReel = !!reelHref && !!wrappedStats;
   const backHref = hasReel && reelHref ? reelHref : user ? "/groups" : "/";
   const backLabel = hasReel ? "My reel" : user ? "Your groups" : "Home";
+  // The shared bar adds the route to "Your groups" whenever the back link points elsewhere
+  const nav = <AppNav secondary={user && backHref !== "/groups" ? { href: "/groups", label: "Your groups" } : undefined} />;
   const rememberInvite = () =>
     setPendingInvite({ code: group.invite_code, groupName: group.name, groupId: group.id });
 
@@ -705,7 +709,7 @@ function GroupDetail() {
     // Already pitched, already has a reel, already signed in: no second pitch, just the form
     if (directAdd) {
       return (
-        <main className="min-h-screen flex flex-col px-6 pt-3 pb-12" style={{ background: "var(--color-bg)" }}>
+        <>{nav}<main className="min-h-screen flex flex-col px-6 pt-3 pb-12" style={{ background: "var(--color-bg)" }}>
           {backLink}
           <div className="w-full max-w-md mx-auto flex-1 flex flex-col justify-center py-10 gap-6">
             <div>
@@ -738,19 +742,19 @@ function GroupDetail() {
             </div>
             {joinForm}
           </div>
-        </main>
+        </main></>
       );
     }
 
     return (
-      <main className="min-h-screen flex flex-col px-6 pt-3 pb-12" style={{ background: "var(--color-bg)" }}>
+      <>{nav}<main className="min-h-screen flex flex-col px-6 pt-3 pb-12" style={{ background: "var(--color-bg)" }}>
         {backLink}
         <div className="w-full max-w-xl mx-auto flex-1 flex flex-col justify-center py-10">
           <InviteFrame groupName={group.name} teaser={teaser}>
             {action}
           </InviteFrame>
         </div>
-      </main>
+      </main></>
     );
   }
 
@@ -828,7 +832,7 @@ function GroupDetail() {
   );
 
   return (
-    <main className="min-h-screen px-6 py-10 overflow-x-clip" style={{ background: "var(--color-bg)" }}>
+    <>{nav}<main className="min-h-screen px-6 pt-6 pb-10 overflow-x-clip" style={{ background: "var(--color-bg)" }}>
       <div className="max-w-2xl mx-auto">
         {/* Header: the group's name lands like a reel hero, over the screening-room glow */}
         <header className="mb-10">
@@ -999,7 +1003,7 @@ function GroupDetail() {
               href={`/groups/${encodeURIComponent(groupId)}/compare`}
               className={`${primary === "compare" ? "btn-primary" : "btn-secondary"} mt-5 w-full px-6 py-3 sm:w-auto`}
             >
-              See the full standings
+              {members.length > STANDINGS_PREVIEW ? "Everyone, plus the awards" : "See the full standings"}
               <ArrowRightIcon />
             </Link>
           </section>
@@ -1029,7 +1033,8 @@ function GroupDetail() {
               Comparing unlocks when a second person joins.
             </p>
           )}
-          {members.length > STANDINGS_PREVIEW && (
+          {/* Only when the head-to-head (and its compare button) isn't shown: one compare link per page */}
+          {members.length > STANDINGS_PREVIEW && !comparison && (
             <Link
               href={`/groups/${encodeURIComponent(groupId)}/compare`}
               className="mt-2 inline-flex min-h-[44px] items-center gap-2 text-sm font-semibold underline underline-offset-4"
@@ -1061,7 +1066,7 @@ function GroupDetail() {
           <LeaveGroup groupId={group.id} groupName={group.name} ownedByMe={isOwner} onLeft={handleLeft} />
         )}
       </div>
-    </main>
+    </main></>
   );
 }
 

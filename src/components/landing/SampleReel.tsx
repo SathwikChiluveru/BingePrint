@@ -277,7 +277,7 @@ export function SampleReel() {
                       onClick={() => setIndex(i)}
                       aria-label={`Sample slide ${i + 1} of ${SLIDES.length}: ${s.label}`}
                       aria-current={active ? "true" : undefined}
-                      className="flex h-11 w-10 items-center justify-center rounded-full"
+                      className="-mx-0.5 flex h-11 w-11 items-center justify-center rounded-full"
                     >
                       <span
                         aria-hidden="true"

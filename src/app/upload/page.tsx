@@ -6,6 +6,7 @@ import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import { isPendingInviteFresh, useAutoplayedStore } from "@/lib/store";
 import { PARSING_LABEL, useReelUpload } from "@/lib/upload/useReelUpload";
 import { ExternalIcon, FileIcon, LockIcon } from "@/components/landing/icons";
+import AppNav from "@/components/AppNav";
 
 const EASE_OUT_EXPO = [0.16, 1, 0.3, 1] as const;
 const mono = { fontFamily: "var(--font-mono)" } as const;
@@ -70,28 +71,7 @@ export default function UploadPage() {
     <MotionConfig reducedMotion="user">
       <div className="flex min-h-screen flex-col overflow-x-clip" style={{ background: "var(--color-bg)" }}>
         {/* Same thin bar as the landing; the wordmark is white here so the page's one red thing is the file action */}
-        <header
-          className="sticky top-0 z-50"
-          style={{
-            background: "var(--color-bg-translucent)",
-            backdropFilter: "blur(20px)",
-            WebkitBackdropFilter: "blur(20px)",
-            borderBottom: "1px solid var(--color-border)",
-          }}
-        >
-          <nav className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-6 py-2" aria-label="Main">
-            <Link
-              href="/"
-              className="inline-flex min-h-11 items-center text-xl font-black"
-              style={{ color: "var(--color-text)", letterSpacing: "-0.02em" }}
-            >
-              Autoplayed
-            </Link>
-            <Link href="/" className="btn-secondary px-4 text-sm">
-              Back
-            </Link>
-          </nav>
-        </header>
+        <AppNav secondary={{ href: "/", label: "Back" }} />
 
         <main className="flex flex-1 flex-col px-6 pb-12 pt-6 md:pt-14">
           <motion.div
@@ -308,7 +288,7 @@ export default function UploadPage() {
 
             <p className="mt-10 text-center text-xs" style={{ color: "var(--color-muted)" }}>
               Autoplayed is not affiliated with Netflix, Inc. ·{" "}
-              <Link href="/privacy" className="underline underline-offset-4 hover:text-white">
+              <Link href="/privacy" className="-my-3 inline-block px-1 py-3 underline underline-offset-4 hover:text-white">
                 Privacy
               </Link>
             </p>
