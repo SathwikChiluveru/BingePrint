@@ -24,7 +24,7 @@ function Blank() {
 function MissingReel({ savedSessionId }: { savedSessionId: string | null }) {
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "var(--color-bg)" }}>
-    <AppNav secondary={{ href: "/", label: "Back" }} />
+    <AppNav secondary={{ href: "/", label: "Home" }} />
     <main className="flex-1 flex items-center justify-center px-6 py-12">
       <div className="card p-6 w-full max-w-md flex flex-col gap-4 text-center">
         <h1 className="text-title font-semibold">This reel lives in the browser that made it.</h1>

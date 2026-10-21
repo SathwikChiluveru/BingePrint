@@ -87,7 +87,11 @@ export function Slide5BingeBeast({ stats }: Props) {
   // dropped there: the exact count is the hero, and a second hedged number would only restate it.
   const watching =
     titles.length > 0
-      ? `Mostly ${titles.slice(0, 2).join(", ")}${titles.length > 2 ? ` +${(titles.length - 2).toLocaleString()} more` : ""}.`
+      ? `Mostly ${titles
+          .slice(0, 2)
+          // Quoted, so a title like "Dark" reads as a title, not "Mostly Dark"
+          .map((t) => `“${t}”`)
+          .join(", ")}${titles.length > 2 ? ` +${(titles.length - 2).toLocaleString()} more` : ""}.`
       : "";
   const footnote = estimated
     ? `Your file has dates only, so a binge counts one calendar day.${watching ? ` ${watching}` : ""}`

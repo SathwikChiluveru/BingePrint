@@ -12,8 +12,24 @@ export const metadata: Metadata = {
 // button yet ("Leave" exists).
 const CONTACT_EMAIL = "sathwikchiluveru@gmail.com";
 
-const LAST_UPDATED = "2026-10-20";
-const LAST_UPDATED_LABEL = "20 October 2026";
+const LAST_UPDATED = "2026-10-21";
+const LAST_UPDATED_LABEL = "21 October 2026";
+
+// The page in three rows, before the detail
+const SUMMARY: { term: string; detail: string }[] = [
+  {
+    term: "Never leaves your device",
+    detail: "Your Netflix file, the device, country and profile details in it, and your Receipts page.",
+  },
+  {
+    term: "Only if you join a group",
+    detail: "Your summary stats, the nickname you pick and your personality label.",
+  },
+  {
+    term: "Stays on this device",
+    detail: "Your reel.",
+  },
+];
 
 const link = "underline underline-offset-4 decoration-[var(--color-border-strong)] hover:decoration-current";
 
@@ -43,7 +59,7 @@ function Strong({ children }: { children: React.ReactNode }) {
 export default function PrivacyPage() {
   return (
     <div className="flex min-h-screen flex-col" style={{ background: "var(--color-bg)" }}>
-      <AppNav secondary={{ href: "/", label: "Back" }} />
+      <AppNav secondary={{ href: "/", label: "Home" }} />
 
       <main className="flex-1 px-4 pt-12 pb-20 sm:px-6 sm:pt-16">
         <article className="mx-auto max-w-[65ch] leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
@@ -57,6 +73,26 @@ export default function PrivacyPage() {
             Your Netflix file is read in your browser and never uploaded. Summary stats leave your device only
             when you create or join a group.
           </p>
+
+          <section aria-labelledby="summary" className="mt-8">
+            <h2 id="summary" className="text-sm font-semibold" style={{ color: "var(--color-text)" }}>
+              What leaves your device
+            </h2>
+            <dl className="mt-3 border-t" style={{ borderColor: "var(--color-border)" }}>
+              {SUMMARY.map((row) => (
+                <div
+                  key={row.term}
+                  className="grid gap-1 border-b py-3 sm:grid-cols-[14rem_1fr] sm:gap-4"
+                  style={{ borderColor: "var(--color-border)" }}
+                >
+                  <dt className="text-sm font-semibold" style={{ color: "var(--color-text)" }}>
+                    {row.term}
+                  </dt>
+                  <dd className="text-sm">{row.detail}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
 
           <Section id="file" title="Your Netflix file">
             <p>
@@ -77,6 +113,10 @@ export default function PrivacyPage() {
                 <Strong>The invite you arrived through</Strong> (code and group name, ignored after 7 days) and{" "}
                 <Strong>the group you last created or joined</Strong> (its id, name and invite code), so the app can
                 send you back to them.
+              </li>
+              <li>
+                <Strong>Your Receipts page</Strong> (devices, countries, profiles, relapses and the graveyard) is
+                worked out on this device and is never sent anywhere, not even to a group.
               </li>
               <li>
                 <Strong>Which slide you were on</Strong>, in session storage, which your browser clears when you close

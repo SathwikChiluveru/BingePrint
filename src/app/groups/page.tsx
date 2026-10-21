@@ -86,7 +86,8 @@ function BackButton({ onClick }: { onClick: () => void }) {
 function PageShell({ children, wide = false }: { children: React.ReactNode; wide?: boolean }) {
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "var(--color-bg)" }}>
-      <AppNav secondary={{ href: "/", label: "Back" }} />
+      {/* "Home" leaves the groups flow; the inline Back only steps between modes, so they never overlap */}
+      <AppNav secondary={{ href: "/", label: "Home" }} />
       <main className={`w-full mx-auto flex-1 flex flex-col justify-center px-6 py-8 pb-12 ${wide ? "max-w-xl" : "max-w-md"}`}>
         {children}
       </main>
@@ -128,6 +129,8 @@ function GroupsContent() {
     badJoinParam ? "That invite link looks broken. Type the code your friend sent you instead." : null
   );
   const autoJoinStarted = useRef(false);
+  // Read at click time by actions inside error messages, which outlive the render they came from
+  const signedInRef = useRef<boolean | null>(null);
 
   const suggestedName = suggestGroupName(wrappedStats?.personality);
   const groupName = typedName ?? suggestedName;
@@ -140,10 +143,15 @@ function GroupsContent() {
     const timer = setTimeout(() => controller.abort(), LOOKUP_TIMEOUT_MS);
     try {
       const res = await fetch(`/api/groups/lookup?code=${encodeURIComponent(code)}`, { signal: controller.signal });
-      if (res.status === 401) return { kind: "signin" };
-      if (res.status === 429) return { kind: "rate-limited" };
-      if (res.status === 404 || res.status === 400) return { kind: "not-found" };
-      if (!res.ok) return { kind: "error" };
+      // Early returns still release the body, or the request stays open and never reads as finished
+      const done = async (outcome: LookupOutcome): Promise<LookupOutcome> => {
+        await res.body?.cancel().catch(() => {});
+        return outcome;
+      };
+      if (res.status === 401) return done({ kind: "signin" });
+      if (res.status === 429) return done({ kind: "rate-limited" });
+      if (res.status === 404 || res.status === 400) return done({ kind: "not-found" });
+      if (!res.ok) return done({ kind: "error" });
       return { kind: "found", group: (await res.json()) as GroupPreview };
     } catch {
       return controller.signal.aborted ? { kind: "timeout" } : { kind: "error" };
@@ -176,7 +184,15 @@ function GroupsContent() {
         outcome.kind === "not-found" ? (
           <>
             No group uses the code <InviteCodeChip code={code} size="inline" />. Check it with whoever sent it,
-            or start your own group.
+            or{" "}
+            <button
+              type="button"
+              onClick={startOwnGroup}
+              className="inline-flex min-h-11 items-center -my-3 underline underline-offset-2 font-semibold"
+            >
+              start your own group
+            </button>
+            .
           </>
         ) : outcome.kind === "rate-limited" ? (
           "Too many tries, wait a minute. Codes are rate limited to stop guessing. Your invite still works."
@@ -209,10 +225,14 @@ function GroupsContent() {
     createClient()
       .auth.getSession()
       .then(({ data }) => {
-        if (!cancelled) setSignedIn(Boolean(data.session));
+        if (cancelled) return;
+        signedInRef.current = Boolean(data.session);
+        setSignedIn(Boolean(data.session));
       })
       .catch(() => {
-        if (!cancelled) setSignedIn(false);
+        if (cancelled) return;
+        signedInRef.current = false;
+        setSignedIn(false);
       });
     return () => {
       cancelled = true;
@@ -223,6 +243,12 @@ function GroupsContent() {
     const params = new URLSearchParams({ mode: "create" });
     if (name) params.set("name", name);
     return `/auth/login?next=${encodeURIComponent(`/groups?${params.toString()}`)}`;
+  }
+
+  // Same rule as the choose screen: signed-out visitors sign in before naming a group
+  function startOwnGroup() {
+    if (signedInRef.current === false) router.push(signInToCreateHref());
+    else goTo("create");
   }
 
   // Opened from an invite link: look the group up straight away

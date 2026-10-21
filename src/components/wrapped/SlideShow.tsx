@@ -16,6 +16,9 @@ import { Slide7DayHeatmap } from "./slides/Slide7DayHeatmap";
 import { Slide8Personality } from "./slides/Slide8Personality";
 import { Slide9MostLoyal } from "./slides/Slide9MostLoyal";
 import { Slide10Share } from "./slides/Slide10Share";
+import { SlideThreeAm, threeAmSummary } from "./slides/SlideThreeAm";
+import { SlideRelapse, hasRelapses, relapseSummary } from "./slides/SlideRelapse";
+import { SlideGraveyard, graveyardSummary, hasGraveyard } from "./slides/SlideGraveyard";
 
 interface Props {
   stats: WrappedStats;
@@ -69,7 +72,10 @@ const SLIDE_TITLES = new Map<unknown, string>([
   [Slide4TopShows, "Top five"],
   [Slide5BingeBeast, "Biggest binge"],
   [Slide6NightOwl, "Night owl"],
+  [SlideThreeAm, "The 3am Report"],
   [Slide7DayHeatmap, "Your week"],
+  [SlideRelapse, "Relapse tracker"],
+  [SlideGraveyard, "The graveyard"],
   [Slide9MostLoyal, "Most loyal"],
   [Slide8Personality, "Personality"],
   [Slide10Share, "Your card"],
@@ -123,8 +129,25 @@ function slideSummary(type: unknown, stats: WrappedStats): string | null {
       return `${plural(h, "hour", "hours")}${m > 0 ? ` ${plural(m, "minute", "minutes")}` : ""} straight`;
     }
     case Slide6NightOwl: {
-      const score = Number(stats.nightOwlScore);
-      return Number.isFinite(score) ? `${Math.max(0, Math.min(100, Math.round(score)))}% night owl` : null;
+      // Same tier title as the slide (Slide6NightOwl getTier), so the summary never contradicts it.
+      const raw = Number(stats.nightOwlScore);
+      if (!Number.isFinite(raw)) return null;
+      const score = Math.max(0, Math.min(100, Math.round(raw)));
+      const rawPeak = Number(stats.peakHour);
+      const peakHour = Number.isInteger(rawPeak) && rawPeak >= 0 && rawPeak <= 23 ? rawPeak : null;
+      const title =
+        score > 60
+          ? "Certified night owl"
+          : score >= 35
+            ? "Working both shifts"
+            : peakHour === null
+              ? "Mostly daytime"
+              : peakHour >= 5 && peakHour < 12
+                ? "Early bird"
+                : peakHour >= 12 && peakHour <= 21
+                  ? "Prime-time regular"
+                  : "Occasional night owl";
+      return `${title}: ${score}% after 10pm`;
     }
     case Slide7DayHeatmap: {
       const counts = stats.dayTitleCounts;
@@ -135,6 +158,12 @@ function slideSummary(type: unknown, stats: WrappedStats): string | null {
       const peak = days.reduce<{ day: string; value: number } | null>((a, b) => (!a || b.value > a.value ? b : a), null);
       return peak && peak.value > 0 ? `you live for ${DAY_NAMES[peak.day] ?? peak.day}s` : null;
     }
+    case SlideThreeAm:
+      return threeAmSummary(stats) || null;
+    case SlideRelapse:
+      return relapseSummary(stats).replace(/^Relapse:\s*/, "") || null;
+    case SlideGraveyard:
+      return graveyardSummary(stats) || null;
     case Slide9MostLoyal:
       return stats.mostLoyalShow?.title ?? null;
     case Slide8Personality:
@@ -259,7 +288,11 @@ export function SlideShow({ stats, sessionId }: Props) {
     <Slide5BingeBeast key="5" stats={stats} />,
     // Night owl score and peak hour are meaningless without time-of-day data.
     hasTimeData ? <Slide6NightOwl key="6" stats={stats} /> : null,
+    // Full exports get the heatmap; quick exports get its locked teaser with the how-to.
+    <SlideThreeAm key="3am" stats={stats} />,
     <Slide7DayHeatmap key="7" stats={stats} />,
+    hasRelapses(stats) ? <SlideRelapse key="relapse" stats={stats} /> : null,
+    hasGraveyard(stats) ? <SlideGraveyard key="graveyard" stats={stats} /> : null,
     showMostLoyal ? <Slide9MostLoyal key="9" stats={stats} /> : null,
     // Personality is the climax: it plays last, right before the card.
     <Slide8Personality key="8" stats={stats} />,

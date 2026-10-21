@@ -115,7 +115,8 @@ export default function LandingPage() {
           </span>
           <p>
             Autoplayed is not affiliated with Netflix, Inc. ·{" "}
-            <Link href="/privacy" className="-my-3 inline-block px-1 py-3 underline underline-offset-4 hover:text-white">
+            {/* 14px padding cancelled by -14px margin: a 44px+ hit area that leaves the line box alone */}
+            <Link href="/privacy" className="-my-[14px] inline-block px-1 py-[14px] underline underline-offset-4 hover:text-white">
               Privacy
             </Link>
           </p>

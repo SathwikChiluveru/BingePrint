@@ -38,15 +38,16 @@ function ExportArtifact() {
 function ReelArtifact() {
   // Frames the hero reel never shows: estimated watch time (with its "~") and the busiest weekday.
   // True 9:16 sample frames at the sample-slide radius; one faint glow sits behind the active frame only.
+  // Each frame reads like a real slide: kicker, a hero sized to the frame (container query units), one roast.
   const frames = [
-    { label: "Watch time", value: "~4,046h", kind: "number", active: true },
-    { label: "Your week", value: "Sundays", kind: "word", active: false },
+    { label: "Watch time", value: "~4,046h", roast: "About 168 days. Back to back.", active: true },
+    { label: "Your week", value: "Sundays", roast: "The couch knows your shape.", active: false },
   ];
   return (
     <div className="w-full">
       <div className="flex items-center justify-center gap-3" aria-hidden="true">
         {frames.map((f) => (
-          <div key={f.label} className="relative isolate w-[48%] max-w-[10rem]">
+          <div key={f.label} className="@container relative isolate w-[48%] max-w-[10rem]">
             {f.active && (
               <div
                 className="pointer-events-none absolute inset-[-45%] -z-10 opacity-70"
@@ -70,13 +71,13 @@ function ReelArtifact() {
                 {f.label}
               </span>
               <span
-                className={`mt-1 font-black ${f.kind === "number" ? "text-3xl tabular-nums" : "text-2xl leading-tight"}`}
-                style={{
-                  letterSpacing: "-0.03em",
-                  color: f.active ? "var(--color-text)" : "var(--color-text-secondary)",
-                }}
+                className="mt-2 font-black tabular-nums text-[20cqw] leading-none"
+                style={{ letterSpacing: "-0.04em", color: "var(--color-text)" }}
               >
                 {f.value}
+              </span>
+              <span className="mt-3 text-xs leading-snug text-balance" style={{ color: "var(--color-text-secondary)" }}>
+                {f.roast}
               </span>
             </div>
           </div>

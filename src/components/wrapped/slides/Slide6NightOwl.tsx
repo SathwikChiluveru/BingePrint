@@ -32,7 +32,18 @@ function getTier(score: number, peakHour: number | null) {
   if (score >= SPLIT_SHIFT_THRESHOLD) {
     return { title: "Working both shifts", line: `${peak}Day shift, night shift. The remote clocks in for both.` };
   }
-  return { title: "Early bird", line: `${peak}Watching TV at a reasonable hour? Suspicious.` };
+  // Low night share: the title follows the peak hour, so a 6pm peak is never called an early bird.
+  // Keep in sync with the Slide6NightOwl summary in SlideShow.tsx.
+  if (peakHour !== null && peakHour >= 5 && peakHour < 12) {
+    return { title: "Early bird", line: `${peak}Watching TV at a reasonable hour? Suspicious.` };
+  }
+  if (peakHour !== null && peakHour >= 12 && peakHour <= 21) {
+    return { title: "Prime-time regular", line: `${peak}Watching TV at a reasonable hour? Suspicious.` };
+  }
+  if (peakHour !== null) {
+    return { title: "Occasional night owl", line: `${peak}Mostly sensible hours, with the odd late one.` };
+  }
+  return { title: "Mostly daytime", line: "Watching TV at a reasonable hour? Suspicious." };
 }
 
 export function Slide6NightOwl({ stats }: Props) {

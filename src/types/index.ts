@@ -24,7 +24,8 @@ export interface RelapseShow {
   restarts: number;
   /** Distinct episodes watched on 2+ separate days (shows); 0 for movies */
   rewatchedEpisodes: number;
-  /** One ISO date per relapse (each restart or rewatch day), chronological, at most 24 */
+  /** ISO dates, chronological, at most 24. Shows: the original first watch ("Day 0"), then one date
+   *  per restart. Movies: one date per separate watch day. */
   timeline: string[];
 }
 

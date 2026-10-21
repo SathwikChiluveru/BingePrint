@@ -69,9 +69,12 @@ export function LandingDropZone() {
         <span
           id="landing-file-note"
           className="mt-3 flex items-center gap-2 border-t pt-3 text-sm font-semibold"
-          style={{ borderColor: "var(--color-border)", color: "var(--color-success)" }}
+          style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
         >
-          <LockIcon size={16} />
+          {/* Green is for status: only the lock carries it, same as the /upload lock line */}
+          <span className="shrink-0" style={{ color: "var(--color-success)" }}>
+            <LockIcon size={16} />
+          </span>
           Read on this device. Never uploaded.
         </span>
       </label>

@@ -4,6 +4,7 @@ import { useState, useSyncExternalStore, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import AppNav from "@/components/AppNav";
 import { createClient } from "@/lib/supabase/client";
 import { isInAppBrowser } from "@/lib/share/safety";
 import { isPendingInviteFresh, useAutoplayedStore } from "@/lib/store";
@@ -222,13 +223,7 @@ function LoginForm() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
-      <Link
-        href="/"
-        className="-ml-1 inline-flex items-center min-h-[44px] px-1 text-title font-black tracking-[-0.02em]"
-        style={{ color: "var(--color-text)" }}
-      >
-        Autoplayed
-      </Link>
+      {/* The shared bar above carries the wordmark home, so the card starts at its heading */}
       <h1 className="text-title font-semibold">Sign in</h1>
       <p className="text-sm mt-1 mb-6" style={{ color: "var(--color-text-secondary)" }}>
         {intentLine(next, personality, inviteGroup)}
@@ -377,25 +372,25 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div
-      className="relative isolate min-h-screen flex flex-col items-center justify-center gap-6 px-4 py-8 overflow-hidden"
-      style={{ background: "var(--color-bg)" }}
-    >
-      {/* The screening room: the reel's red glow sits behind the card, the one red action sits on it */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 -z-10"
-        style={{ background: "var(--glow-hero)" }}
-      />
-      <Suspense>
-        <LoginForm />
-      </Suspense>
-      <p className="text-center text-xs" style={{ color: "var(--color-muted)" }}>
-        Autoplayed is not affiliated with Netflix, Inc. ·{" "}
-        <Link href="/privacy" className="underline underline-offset-4 hover:text-white">
-          Privacy
-        </Link>
-      </p>
+    <div className="min-h-screen flex flex-col" style={{ background: "var(--color-bg)" }}>
+      <AppNav secondary={{ href: "/", label: "Home" }} />
+      <main className="relative isolate flex-1 flex flex-col items-center justify-center gap-6 px-4 py-8 overflow-hidden">
+        {/* The screening room: the reel's red glow sits behind the card, the one red action sits on it */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 -z-10"
+          style={{ background: "var(--glow-hero)" }}
+        />
+        <Suspense>
+          <LoginForm />
+        </Suspense>
+        <p className="text-center text-xs" style={{ color: "var(--color-muted)" }}>
+          Autoplayed is not affiliated with Netflix, Inc. ·{" "}
+          <Link href="/privacy" className="-my-[14px] inline-block px-1 py-[14px] underline underline-offset-4 hover:text-white">
+            Privacy
+          </Link>
+        </p>
+      </main>
     </div>
   );
 }

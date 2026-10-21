@@ -3,8 +3,11 @@ import Link from "next/link";
 /**
  * The thin bar every page past the landing shares: white wordmark home, plus at most one quiet
  * secondary. The wordmark stays white so each page's one red thing is its own primary action.
+ * A secondary pointing home reads "Home" (never "Back"): it is a destination, not a history step,
+ * so it never doubles a page's own inline back control.
  */
-export default function AppNav({ secondary }: { secondary?: { href: string; label: string } }) {
+export default function AppNav({ secondary }: { secondary?: { href: string; label?: string } }) {
+  const secondaryLabel = secondary ? (secondary.label ?? (secondary.href === "/" ? "Home" : undefined)) : undefined;
   return (
     <header
       className="sticky top-0 z-50"
@@ -23,9 +26,9 @@ export default function AppNav({ secondary }: { secondary?: { href: string; labe
         >
           Autoplayed
         </Link>
-        {secondary && (
+        {secondary && secondaryLabel && (
           <Link href={secondary.href} className="btn-secondary px-4 text-sm">
-            {secondary.label}
+            {secondaryLabel}
           </Link>
         )}
       </nav>

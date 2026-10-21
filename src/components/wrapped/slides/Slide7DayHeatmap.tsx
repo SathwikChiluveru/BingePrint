@@ -113,8 +113,14 @@ export function Slide7DayHeatmap({ stats }: Props) {
   // Visible characters: digits plus the "~" and unit for estimated hours.
   const heroLength = heroText.length + (countMode ? 0 : 1 + (estimated ? 1 : 0));
   const heroStyle = heroLength >= 5 ? { fontSize: LONG_HERO_FONT_SIZE } : undefined;
+  // Under four weeks, or when it rounds to the hero's own figure, the average only repeats the hero.
+  const rawWeeklyAverage =
+    peakDay && stats.weeksSpanned != null && stats.weeksSpanned >= 4 ? peakHours / stats.weeksSpanned : null;
   const weeklyAverage =
-    peakDay && stats.weeksSpanned != null ? peakHours / Math.max(1, stats.weeksSpanned) : null;
+    rawWeeklyAverage !== null &&
+    splitHours(rawWeeklyAverage, estimated).join("") !== splitHours(peakHours, estimated).join("")
+      ? rawWeeklyAverage
+      : null;
   const titleWord = peakDay?.value === 1 ? "title" : "titles";
 
   return (

@@ -71,7 +71,7 @@ export default function UploadPage() {
     <MotionConfig reducedMotion="user">
       <div className="flex min-h-screen flex-col overflow-x-clip" style={{ background: "var(--color-bg)" }}>
         {/* Same thin bar as the landing; the wordmark is white here so the page's one red thing is the file action */}
-        <AppNav secondary={{ href: "/", label: "Back" }} />
+        <AppNav secondary={{ href: "/", label: "Home" }} />
 
         <main className="flex flex-1 flex-col px-6 pb-12 pt-6 md:pt-14">
           <motion.div
@@ -223,8 +223,13 @@ export default function UploadPage() {
                       className="font-semibold underline underline-offset-4 hover:text-white"
                       style={{ color: "var(--color-text)" }}
                     >
-                      netflix.com/viewingactivity
-                      <ExternalIcon size={14} className="ml-1 inline-block align-[-2px]" />
+                      {/* Never breaks inside: in the narrow desktop column it may break after the
+                          slash, and the external icon always stays on the line with the text */}
+                      netflix.com/<wbr />
+                      <span className="whitespace-nowrap">
+                        viewingactivity
+                        <ExternalIcon size={14} className="ml-1 inline-block align-[-2px]" />
+                      </span>
                       <span className="sr-only"> (opens in a new tab)</span>
                     </a>{" "}
                     in a browser, not the app
@@ -288,7 +293,8 @@ export default function UploadPage() {
 
             <p className="mt-10 text-center text-xs" style={{ color: "var(--color-muted)" }}>
               Autoplayed is not affiliated with Netflix, Inc. ·{" "}
-              <Link href="/privacy" className="-my-3 inline-block px-1 py-3 underline underline-offset-4 hover:text-white">
+              {/* 14px padding cancelled by -14px margin: a 44px-tall hit area that leaves the line box alone */}
+              <Link href="/privacy" className="-my-[14px] inline-block px-1 py-[14px] underline underline-offset-4 hover:text-white">
                 Privacy
               </Link>
             </p>

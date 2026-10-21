@@ -913,6 +913,17 @@ export function Slide10Share({ stats, sessionId, autoCreate = false }: Props) {
 
           {groupLink}
 
+          {/* The on-device receipts (money, plan value, account check). Quiet, never a CTA. */}
+          {sessionId && (
+            <Link
+              href={`/wrapped/${encodeURIComponent(sessionId)}/receipts`}
+              className="self-center inline-flex items-center min-h-[44px] px-3 text-sm underline-offset-4 hover:underline short:hidden!"
+              style={{ color: "var(--color-text-secondary)" }}
+            >
+              See the receipts
+            </Link>
+          )}
+
           {/*
             Overflow, not an action: hidden on short screens, and in create mode below md so the
             phone layout stays card, tease, CTA, disclosure, one secondary row.
