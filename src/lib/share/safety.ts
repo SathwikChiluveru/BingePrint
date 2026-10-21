@@ -12,12 +12,14 @@ export function safeInviteCode(code: unknown): string | undefined {
 
 /**
  * The summary a group sees: everything except the per-session list (titles and timestamps of every
- * binge). longestBinge stays, since it is one headline stat.
+ * binge) and the insights (devices, countries, profiles, relapses, graveyard), which never leave
+ * the device. longestBinge stays, since it is one headline stat.
  */
-export function toGroupSummary<T extends object>(stats: T): Omit<T, "allBingeSessions"> {
+export function toGroupSummary<T extends object>(stats: T): Omit<T, "allBingeSessions" | "insights"> {
   const copy = { ...stats } as Record<string, unknown>;
   delete copy.allBingeSessions;
-  return copy as Omit<T, "allBingeSessions">;
+  delete copy.insights;
+  return copy as Omit<T, "allBingeSessions" | "insights">;
 }
 
 /**

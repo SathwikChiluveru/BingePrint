@@ -8,6 +8,7 @@ import type {
   Personality,
 } from "@/types";
 
+import { computeInsights } from "./insights";
 const DAYS: DayHeatmap["day"][] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 // Segment after the show name that marks an episode, e.g. "Show: Season 2: Pilot".
@@ -446,5 +447,6 @@ export function computeWrappedStats(entries: NetflixEntry[]): WrappedStats {
     weeksSpanned,
     dayTitleCounts,
     distinctTitleDays,
+    insights: computeInsights(watchEntries, showName, hasTimeData),
   };
 }

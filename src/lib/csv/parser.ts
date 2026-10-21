@@ -63,10 +63,21 @@ function showName(title: string): string {
   return title.split(":")[0].trim();
 }
 
+/**
+ * The full data request logs Start Time in UTC ("2024-03-16 01:00:00", no zone). Read it as UTC so
+ * getHours() reports the viewer's own local hour; reading it as local time shifted every hour stat
+ * by the browser's UTC offset. Strings that already carry a zone are left to Date.
+ */
+function parseUtcStartTime(raw: string): Date {
+  const value = raw.trim();
+  const naive = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(value);
+  return new Date(naive ? `${value.replace(" ", "T")}Z` : value);
+}
+
 function parseFull(rows: Record<string, string>[]): NetflixEntry[] {
   return rows
-    .map((row) => {
-      const startTime = new Date(row["Start Time"] ?? "");
+    .map((row): NetflixEntry | null => {
+      const startTime = parseUtcStartTime(row["Start Time"] ?? "");
       const durationSeconds = parseDuration(row["Duration"] ?? "");
 
       if (isNaN(startTime.getTime()) || durationSeconds === 0) return null;
@@ -78,6 +89,7 @@ function parseFull(rows: Record<string, string>[]): NetflixEntry[] {
         durationSeconds,
         deviceType: row["Device Type"] ?? "",
         supplementalVideoType: row["Supplemental Video Type"] ?? "",
+        country: (row["Country"] ?? "").trim() || undefined,
       } satisfies NetflixEntry;
     })
     .filter((e): e is NetflixEntry => e !== null);
